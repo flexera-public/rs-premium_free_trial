@@ -32,9 +32,9 @@
 
 name 'Rancher Cluster'
 rs_ca_ver 20131202
-short_description "![logo](https://lh3.googleusercontent.com/-rAqNpalaKbM/AAAAAAAAAAI/AAAAAAAAADQ/MtzbmljqEvE/s46-c-k-no/photo.jpg)
+short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_logo.jpg) ![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
 
-Launches a Rancher cluster."
+Launches a Rancher cluster of Docker hosts."
 long_description "Launches a Rancher cluster.\n
 Clouds Supported: <B>AWS, Google</B>"
 
