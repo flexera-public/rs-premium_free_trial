@@ -24,7 +24,6 @@
 #
 # TO-DOs
 # Have link go straight to infrastructure in Rancher
-# See if I can launch concurrently and then run scripts to get the hosts to synch with the server. (Not sure if boot will succeed on host without server data populated.)
 # Add post launch actions to launch some services from Self-Service More Actions menu.
 # Store the API keys in CREDENIALs and use cred: in inputs instead of current clear text approach.
 # Allow user to scale out more hosts after launch. (I'm not convinced there is a safe way to allow scaling in.)
