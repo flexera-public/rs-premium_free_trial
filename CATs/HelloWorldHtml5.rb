@@ -283,6 +283,12 @@ operation "launch" do
   } end
 end
 
+operation "terminate" do
+  condition $inAzure
+  description "Handle Azure timing nuances"
+  definition "azure_terminate"
+end
+
 operation "Update Web Site Text" do
   description "Update the text displayed on the web site."
   definition "update_website"
@@ -375,6 +381,20 @@ define launch_servers(@lb, @web_tier, @ssh_key, @sec_group, @sec_group_rule_http
   end
  
 end 
+
+# Special terminate action taken if launched in Azure to account for Azure cloud clean up.
+define azure_terminate(@lb, @web_tier) do
+  # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
+  # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
+  
+  concurrent do
+    delete(@lb)
+    delete(@web_tier)
+  end
+  
+  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "Pausing to wait for Azure cloud to clean up after server terminate."})
+  sleep(180)
+end
 
 # Store the web text in a tag attached to the deployment.
 # This allows the web text to persist across stop/starts even though in this CAT, the stop actually terminates the server.

@@ -380,7 +380,11 @@ define update_password(@windows_server, $param_password) do
 end
 
 # Delete the credential created for the windows password
-define terminate_server() do
+define terminate_server(@windows_server) do
+  
+  delete(@windows_server)
+  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "Pausing to wait for Azure cloud to clean up after server terminate."})
+  sleep(180)
   
   # Delete the cred we created for the user-provided password
   $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])

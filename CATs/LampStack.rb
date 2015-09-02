@@ -417,6 +417,12 @@ operation "launch" do
   } end
 end
 
+operation "terminate" do
+  condition $inAzure
+  description "Handle Azure timing nuances"
+  definition "azure_terminate"
+end
+
 operation "Update Application Code" do
   description "Select and install a different repo and branch of code."
   definition "install_appcode"
@@ -543,6 +549,21 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   $site_link = join(["http://", $server_addr, "/dbread"])
   $lb_status_link = join(["http://", $server_addr, "/haproxy-status"])
 end 
+
+# Special terminate action taken if launched in Azure to account for Azure cloud clean up.
+define azure_terminate(@lb_server, @app_server, @db_server) do
+  # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
+  # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
+  
+  concurrent do
+    delete(@lb_server)
+    delete(@app_server)
+    delete(@db_server)
+  end
+  
+  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "Pausing to wait for Azure cloud to clean up after server terminate."})
+  sleep(180)
+end
 
 # Install a new branch of app code to change colors and some text on the webpage.
 define install_appcode($param_appcode, @app_server) do

@@ -284,6 +284,12 @@ operation "enable" do
   } end
 end
 
+operation "terminate" do
+  condition $inAzure
+  description "Handle Azure timing nuances"
+  definition "azure_terminate"
+end
+
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
@@ -331,6 +337,17 @@ define enable(@linux_server, $inAzure, $invSphere) return $server_ip_address do
        $server_ip_address = join(["rightscale@", $server_addr])
     end
 end 
+
+# Special terminate action taken if launched in Azure to account for Azure cloud clean up.
+define azure_terminate(@linux_server) do
+  # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
+  # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
+  
+  delete(@linux_server)
+  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "Pausing to wait for Azure cloud to clean up after server terminate."})
+  sleep(180)
+  
+end
 
 # Checks if the account supports the selected cloud
 define checkCloudSupport($cloud_name, $param_location) do

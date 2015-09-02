@@ -382,6 +382,12 @@ operation 'launch' do
   } end
 end 
 
+operation "terminate" do
+  condition $inAzure
+  description "Handle Azure timing nuances"
+  definition "azure_terminate"
+end
+
 # Import and set up what is needed for the server and then launch it.
 # This does NOT install WordPress.
 define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sgrule_datanode_address, @sgrule_datanode_http, @sgrule_datanode_ipc, @sgrule_namenode_address, @sgrule_namenode_http, @ssh_key, @placement_group, $hadoop_config, $map_cloud, $map_st, $param_location, $needsSshKey, $needsSecurityGroup, $needsPlacementGroup, $inAzure) return @namenode, @datanode_cluster, @sec_group, @ssh_key, $namenode_portal, $data_portal do
@@ -490,6 +496,20 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
   $data_portal = join(["http://", to_s(@namenode.current_instance().public_ip_addresses[0]), ":", map( $hadoop_config, "ports", "datanode_http")])
  
 end 
+
+# Special terminate action taken if launched in Azure to account for Azure cloud clean up.
+define azure_terminate(@namenode, @datanode_cluster) do
+  # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
+  # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
+  
+  concurrent do
+    delete(@datanode_cluster)
+    delete(@namenode)
+  end
+  
+  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "Pausing to wait for Azure cloud to clean up after server terminate."})
+  sleep(180)
+end
 
 # Checks if the account supports the selected cloud
 define checkCloudSupport($cloud_name, $param_location) do
