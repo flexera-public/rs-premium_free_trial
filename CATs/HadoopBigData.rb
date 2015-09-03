@@ -502,6 +502,8 @@ define azure_terminate(@namenode, @datanode_cluster, @placement_group) do
   # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
   # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
   
+  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "azure_terminate."})
+
   concurrent do
     delete(@datanode_cluster)
     delete(@namenode)
@@ -509,6 +511,7 @@ define azure_terminate(@namenode, @datanode_cluster, @placement_group) do
   
   # Now retry a few times to delete the placement group
   $attempts=0
+  $succeeded = false
   while ($attempts < 30) && ($succeeded == false) do
      sub on_error: skip do
        @placement_group.destroy()
@@ -517,6 +520,9 @@ define azure_terminate(@namenode, @datanode_cluster, @placement_group) do
      $attempts = $attempts + 1 
      sleep(5)
   end
+  
+  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "azure_terminate: retries:"+to_s($attempts)+"; pg delete success:"+to_s($succeeded)})
+
 end
 
 # Checks if the account supports the selected cloud
