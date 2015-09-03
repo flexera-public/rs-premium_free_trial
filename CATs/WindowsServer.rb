@@ -386,6 +386,7 @@ define terminate_server(@windows_server, @placement_group, $inAzure) do
   if $inAzure
     delete(@windows_server)
     # Now retry a few times to delete the placement group
+    $attempts = 0
     while ($attempts < 30) && ($succeeded == false) do
        sub on_error: skip do
          @placement_group.destroy()
