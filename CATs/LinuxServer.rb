@@ -344,8 +344,15 @@ define azure_terminate(@linux_server) do
   # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
   
   delete(@linux_server)
-  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "Pausing to wait for Azure cloud to clean up after server terminate."})
-  sleep(180)
+  # Now retry a few times to delete the placement group
+  while ($attempts < 30) && ($succeeded == false) do
+     sub on_error: skip do
+       @placement_group.destroy()
+       $succeeded = true
+     end
+     $attempts = $attempts + 1 
+     sleep(5)
+   end
   
 end
 

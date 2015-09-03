@@ -380,11 +380,21 @@ define update_password(@windows_server, $param_password) do
 end
 
 # Delete the credential created for the windows password
-define terminate_server(@windows_server) do
+define terminate_server(@windows_server, @placement_group, $inAzure) do
   
-  delete(@windows_server)
-  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "Pausing to wait for Azure cloud to clean up after server terminate."})
-  sleep(180)
+  # Special terminate action taken if launched in Azure to account for Azure cloud clean up.
+  if $inAzure
+    delete(@windows_server)
+    # Now retry a few times to delete the placement group
+    while ($attempts < 30) && ($succeeded == false) do
+       sub on_error: skip do
+         @placement_group.destroy()
+         $succeeded = true
+       end
+       $attempts = $attempts + 1 
+       sleep(5)
+    end
+  end
   
   # Delete the cred we created for the user-provided password
   $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
