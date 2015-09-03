@@ -551,7 +551,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
 end 
 
 # Special terminate action taken if launched in Azure to account for Azure cloud clean up.
-define azure_terminate(@lb_server, @app_server, @db_server) do
+define azure_terminate(@lb_server, @app_server, @db_server, @placement_group) do
   # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
   # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
   
@@ -562,6 +562,7 @@ define azure_terminate(@lb_server, @app_server, @db_server) do
   end
   
   # Now retry a few times to delete the placement group
+  $attempts=0
   while ($attempts < 30) && ($succeeded == false) do
      sub on_error: skip do
        @placement_group.destroy()
@@ -569,7 +570,7 @@ define azure_terminate(@lb_server, @app_server, @db_server) do
      end
      $attempts = $attempts + 1 
      sleep(5)
-   end
+  end
 end
 
 # Install a new branch of app code to change colors and some text on the webpage.

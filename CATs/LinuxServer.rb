@@ -339,12 +339,13 @@ define enable(@linux_server, $inAzure, $invSphere) return $server_ip_address do
 end 
 
 # Special terminate action taken if launched in Azure to account for Azure cloud clean up.
-define azure_terminate(@linux_server) do
+define azure_terminate(@linux_server, @placement_group) do
   # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
   # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
   
   delete(@linux_server)
   # Now retry a few times to delete the placement group
+  $attempts=0
   while ($attempts < 30) && ($succeeded == false) do
      sub on_error: skip do
        @placement_group.destroy()
@@ -352,7 +353,7 @@ define azure_terminate(@linux_server) do
      end
      $attempts = $attempts + 1 
      sleep(5)
-   end
+ end
   
 end
 

@@ -383,7 +383,7 @@ define launch_servers(@lb, @web_tier, @ssh_key, @sec_group, @sec_group_rule_http
 end 
 
 # Special terminate action taken if launched in Azure to account for Azure cloud clean up.
-define azure_terminate(@lb, @web_tier) do
+define azure_terminate(@lb, @web_tier, @placement_group) do
   # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
   # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
   
@@ -393,6 +393,7 @@ define azure_terminate(@lb, @web_tier) do
   end
   
   # Now retry a few times to delete the placement group
+  $attempts=0
   while ($attempts < 30) && ($succeeded == false) do
      sub on_error: skip do
        @placement_group.destroy()
@@ -400,7 +401,7 @@ define azure_terminate(@lb, @web_tier) do
      end
      $attempts = $attempts + 1 
      sleep(5)
-   end
+  end
 end
 
 # Store the web text in a tag attached to the deployment.

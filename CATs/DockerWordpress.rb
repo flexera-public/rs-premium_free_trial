@@ -332,6 +332,7 @@ define azure_terminate(@docker_server, @placement_group) do
   delete(@docker_server)
 
   # Now retry a few times to delete the placement group
+  $attempts=0
   while ($attempts < 30) && ($succeeded == false) do
      sub on_error: skip do
        @placement_group.destroy()
@@ -339,7 +340,7 @@ define azure_terminate(@docker_server, @placement_group) do
      end
      $attempts = $attempts + 1 
      sleep(5)
-   end
+  end
   
 end
 
