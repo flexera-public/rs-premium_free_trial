@@ -252,6 +252,12 @@ operation "enable" do
   } end
 end
 
+operation "terminate" do
+  condition $inAzure
+  description "Handle Azure timing nuances"
+  definition "azure_terminate"
+end
+
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
@@ -316,6 +322,32 @@ define enable(@docker_server, $invSphere, $inAzure) return $wordpress_link do
   if @task.summary =~ "failed"
     raise "Failed to run " + $right_script_href + " on server, " + @docker_server.href
   end 
+end
+
+# Special terminate action taken if launched in Azure to account for Azure cloud clean up.
+define azure_terminate(@docker_server, @placement_group) do
+  # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
+  # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
+  
+  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "azure_terminate."})
+
+  delete(@docker_server)
+  
+  # Now retry a few times to delete the placement group
+  $attempts=0
+  $succeeded = false
+  while ($attempts < 20) && ($succeeded == false) do
+     sub on_error: skip do
+       rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "azure_terminate: Deleting placement group."})
+       @placement_group.destroy()
+       $succeeded = true
+     end
+     $attempts = $attempts + 1 
+     sleep(10)
+ end
+ 
+ rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "azure_terminate: retries:"+to_s($attempts)+"; pg delete success:"+to_s($succeeded)})
+
 end
 
 # Checks if the account supports the selected cloud
