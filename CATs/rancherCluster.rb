@@ -199,7 +199,7 @@ resource 'rancher_host', type: 'server_array' do
       "max_count"            => 4
     },
     "pacing" => {
-      "resize_calm_time"     => 5, 
+      "resize_calm_time"     => 1, 
       "resize_down_by"       => 1,
       "resize_up_by"         => 1
     },
