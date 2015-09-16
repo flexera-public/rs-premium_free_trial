@@ -83,7 +83,7 @@ output "app2_github_link" do
   label "Blue Application Code"
   category "Code Repositories"
   description "\"Blue\" application repo. (The main change is in the style.css file.)"
-  default_value "https://github.com/MitchellGerdisch/demo_support_files/tree/unified_php_modified"
+  default_value "https://github.com/rs-services/rs-premium_free_trial/tree/unified_php_modified"
 end
 
 
