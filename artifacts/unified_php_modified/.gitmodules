@@ -1,0 +1,3 @@
+[submodule "sub"]
+	path = sub
+	url = git://github.com/rightscale/examples_submodule.git
