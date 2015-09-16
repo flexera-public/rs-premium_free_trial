@@ -386,6 +386,15 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   $body = $response["body"]
   $publicValue = $body["publicValue"] # Public API key
   $secretValue = $body["secretValue"] # Secret API key
+    
+  # Update the Rancher Server inputs (and deployment level for good measure) with the keys for future rancher-compose support.
+  $inp = {
+    'RANCHER_COMPOSE_ACCESS_KEY':join(["text:", $publicValue]),  # to-do: create a CREDENTIAL to store this value and use cred:
+    'RANCHER_COMPOSE_SECRET_KEY':join(["text:", $secretValue]), # to-do: create a CREDENTIAL to store this value and use cred:
+    'RANCHER_COMPOSE_URL':"text:http://localhost:8080/"
+  } 
+  @rancher_server.current_instance().multi_update_inputs(inputs: $inp) 
+  @@deployment.multi_update_inputs(inputs: $inp) 
 
   # Update the Deployment level inputs with the rancher server related values.
   $inp = {
