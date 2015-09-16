@@ -117,11 +117,11 @@ end
 mapping "map_st" do {
   "server" => {
     "name" => "Rancher Server",
-    "rev" => "11",
+    "rev" => "17",
   },
   "host" => {
     "name" => "Rancher Host",
-    "rev" => "6", 
+    "rev" => "7", 
   },
 } end
 
