@@ -1,0 +1,32 @@
+body {min-width: 1024px; margin:0; padding:0; font-size:70.5%; /* font-family:'Lucida Sans', Verdana, Arial, sans-serif; */ font-family:"Lucida Grande","Lucida Sans Unicode","Lucida Sans",Verdana,lucida,sans-serif; background:#FFF; height:100%}
+html {height:100%}
+a img {border:none}
+a {text-decoration:none; color:#1e4a7e}
+
+#header {
+	background:#27CB6E; 
+	padding:2px 20px; 
+	position:relative; 
+	height:25px;
+}
+
+#header #logo {
+	margin-top:3px; 
+}
+
+.code_container {
+	border:1px black solid;
+	background: #2771CB;
+	width:90%;
+	margin-left: auto ;
+    margin-right: auto ;
+    position: relative;
+    top: 10px;
+
+}
+.code {
+	font-family:'Courier New', monospace;
+	position:relative;
+	left:10px;
+
+}

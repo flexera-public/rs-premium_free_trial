@@ -1,0 +1,9 @@
+This is a slightly modified version of what is found in 
+https://github.com/rightscale/examples/tree/unified_php
+
+It is used as a different repo/branch for demonstrating a post-launch action to update the running code
+for the LAMP Stack CAT.
+
+This BRANCH should not be used for anything else.
+
+
