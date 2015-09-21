@@ -117,11 +117,11 @@ end
 mapping "map_st" do {
   "server" => {
     "name" => "Rancher Server",
-    "rev" => "11",
+    "rev" => "17",
   },
   "host" => {
     "name" => "Rancher Host",
-    "rev" => "6", 
+    "rev" => "7", 
   },
 } end
 
@@ -216,8 +216,9 @@ resource "sec_group", type: "security_group" do
   cloud map( $map_cloud, $param_location, "cloud" )
 end
 
+# Needed for Rancher UI and API access.
 resource "sec_group_rule_http8080", type: "security_group_rule" do
-  name "CAT HTTP Rule"
+  name "CAT HTTP 8080 Rule"
   description "Allow HTTP port 8080 access."
   source_type "cidr_ips"
   security_group @sec_group
@@ -227,6 +228,80 @@ resource "sec_group_rule_http8080", type: "security_group_rule" do
   protocol_details do {
     "start_port" => "8080",
     "end_port" => "8080"
+  } end
+end
+
+# Nice to have for stacks launched on the cluster.
+resource "sec_group_rule_http80", type: "security_group_rule" do
+  name "CAT HTTP 80 Rule"
+  description "Allow HTTP port 80 access."
+  source_type "cidr_ips"
+  security_group @sec_group
+  protocol "tcp"
+  direction "ingress"
+  cidr_ips "0.0.0.0/0"
+  protocol_details do {
+    "start_port" => "80",
+    "end_port" => "80"
+  } end
+end
+
+# Nice to have for stacks launched on the cluster.
+resource "sec_group_rule_http443", type: "security_group_rule" do
+  name "CAT HTTP 443 Rule"
+  description "Allow HTTP port 443 access."
+  source_type "cidr_ips"
+  security_group @sec_group
+  protocol "tcp"
+  direction "ingress"
+  cidr_ips "0.0.0.0/0"
+  protocol_details do {
+    "start_port" => "443",
+    "end_port" => "443"
+  } end
+end
+
+# Nice to have SSH access for debugging
+resource "sec_group_rule_ssh", type: "security_group_rule" do
+  name "CAT SSH Rule"
+  description "Allow SSH access."
+  source_type "cidr_ips"
+  security_group @sec_group
+  protocol "tcp"
+  direction "ingress"
+  cidr_ips "0.0.0.0/0"
+  protocol_details do {
+    "start_port" => "22",
+    "end_port" => "22"
+  } end
+end
+
+# UDP 500 and 4500 is needed for the Rancher overlay ipsec network.
+resource "sec_group_rule_udp500", type: "security_group_rule" do
+  name "CAT UDP 500 Rule"
+  description "Allow UDP port 500 access."
+  source_type "cidr_ips"
+  security_group @sec_group
+  protocol "udp"
+  direction "ingress"
+  cidr_ips "0.0.0.0/0"
+  protocol_details do {
+    "start_port" => "500",
+    "end_port" => "500"
+  } end
+end
+
+resource "sec_group_rule_udp4500", type: "security_group_rule" do
+  name "CAT UDP 500 Rule"
+  description "Allow UDP port 4500 access."
+  source_type "cidr_ips"
+  security_group @sec_group
+  protocol "udp"
+  direction "ingress"
+  cidr_ips "0.0.0.0/0"
+  protocol_details do {
+    "start_port" => "4500",
+    "end_port" => "44500"
   } end
 end
 
@@ -260,7 +335,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec_group_rule_http8080, $map_cloud, $param_location, $map_st, $needsSshKey, $needsSecurityGroup)  return @rancher_server, @rancher_host, $rancher_ui_uri  do 
+define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec_group_rule_http8080, @sec_group_rule_http80, @sec_group_rule_http443, @sec_group_rule_ssh, @sec_group_rule_udp500, @sec_group_rule_udp4500, $map_cloud, $param_location, $map_st, $needsSshKey, $needsSecurityGroup)  return @rancher_server, @rancher_host, $rancher_ui_uri  do 
   
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -283,6 +358,11 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   # Provision the security group rules if applicable. (The security group itself is created when the server is provisioned.)
   if $needsSecurityGroup
     provision(@sec_group_rule_http8080)
+    provision(@sec_group_rule_http80)
+    provision(@sec_group_rule_http443)
+    provision(@sec_group_rule_ssh)
+    provision(@sec_group_rule_udp500)
+    provision(@sec_group_rule_udp4500)
   end
 
   # Need to launch the rancher server first since the hosts need to know the URL for the server.
@@ -306,6 +386,15 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   $body = $response["body"]
   $publicValue = $body["publicValue"] # Public API key
   $secretValue = $body["secretValue"] # Secret API key
+    
+  # Update the Rancher Server inputs (and deployment level for good measure) with the keys for future rancher-compose support.
+  $inp = {
+    'RANCHER_COMPOSE_ACCESS_KEY':join(["text:", $publicValue]),  # to-do: create a CREDENTIAL to store this value and use cred:
+    'RANCHER_COMPOSE_SECRET_KEY':join(["text:", $secretValue]), # to-do: create a CREDENTIAL to store this value and use cred:
+    'RANCHER_COMPOSE_URL':"text:http://localhost:8080/"
+  } 
+  @rancher_server.current_instance().multi_update_inputs(inputs: $inp) 
+  @@deployment.multi_update_inputs(inputs: $inp) 
 
   # Update the Deployment level inputs with the rancher server related values.
   $inp = {
