@@ -283,12 +283,6 @@ operation "launch" do
   } end
 end
 
-operation "terminate" do
-  condition $inAzure
-  description "Handle Azure timing nuances"
-  definition "azure_terminate"
-end
-
 operation "Update Web Site Text" do
   description "Update the text displayed on the web site."
   definition "update_website"
@@ -381,34 +375,6 @@ define launch_servers(@lb, @web_tier, @ssh_key, @sec_group, @sec_group_rule_http
   end
  
 end 
-
-# Special terminate action taken if launched in Azure to account for Azure cloud clean up.
-define azure_terminate(@lb, @web_tier, @placement_group) do
-  # Azure has some nuances related to terminating instances over there and it cleaning up all the parts.
-  # So terminate the server and then wait a bit to make sure Azure has finished doing what it needs to do.
-  
-  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "azure_terminate."})
-
-  concurrent do
-    delete(@lb)
-    delete(@web_tier)
-  end
-  
-  # Now retry a few times to delete the placement group
-  $attempts=0
-  $succeeded = false
-  while ($attempts < 30) && ($succeeded == false) do
-     sub on_error: skip do
-       @placement_group.destroy()
-       $succeeded = true
-     end
-     $attempts = $attempts + 1 
-     sleep(5)
-  end
-  
-  rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: "azure_terminate: retries:"+to_s($attempts)+"; pg delete success:"+to_s($succeeded)})
-
-end
 
 # Store the web text in a tag attached to the deployment.
 # This allows the web text to persist across stop/starts even though in this CAT, the stop actually terminates the server.
