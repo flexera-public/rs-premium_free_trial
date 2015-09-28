@@ -480,7 +480,7 @@ end
 ####################
 operation 'launch' do 
   description 'Launch the application' 
-  definition 'launch_cluster_x' 
+  definition 'launch_cluster' 
   output_mappings do {
     $rancher_ui_link => $rancher_ui_uri,
   } end
@@ -489,36 +489,31 @@ end
 operation 'enable' do
   description 'Enable an application stack on the Rancher cluster.'
   definition 'deploy_stack'
-  output_mappings do {
-    $application_link => $app_link,
-  } end
-end
 
-operation 'Launch an Application Stack' do
-  description "Launch an application stack"
-  definition "deploy_stack_x"
-  
   hash = {}
   [*1..10].each do |n|
-    hash[eval("$app_#{n}")] = switch(get(n,$app_ids),  get(0,get(n,$app_ids)), "")
+    hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
+    hash[eval("$app_#{n}_name")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
   end
-    
+
   output_mappings do 
     hash
   end
 end
 
-define launch_cluster_x(@rancher_server) return $rancher_ui_uri do
-  # do nothing of substance
-  $rancher_ui_uri = "http://1.2.3.4/rancher_ui_uri_fillin"
-end
-
-define deploy_stack_x(@rancher_server) return $app_ids do
-  # do nothing of substance
+operation 'Launch an Application Stack' do
+  description "Launch an application stack"
+  definition "deploy_stack"
   
-  $app_ids = []
-  $app_ids << ["http://1.2.3.4/app1"]
-  $app_ids << ["http://1.2.3.4/app2"]
+  hash = {}
+  [*1..10].each do |n|
+    hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
+    hash[eval("$app_#{n}_name")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
+  end
+
+  output_mappings do 
+    hash
+  end
 end
 
 ##########################
@@ -598,7 +593,7 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
 
 end 
 
-define deploy_stack(@rancher_server, $app_stack, $app_stack_name) return $app_link do
+define deploy_stack(@rancher_server, $app_stack, $app_stack_name) return $app_names, $app_links do
   
   $stack_name = $app_stack_name
   
@@ -676,7 +671,13 @@ nginx:
   call launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_compose) 
 
   # Now get the link for the application stack just launched on the cluster ... TBD
-  $app_link = "http://Nothing"
+  $app_names = []
+  $app_names << ["application-1"]
+  $app_names << ["application-2"]
+  $app_links = []
+  $app_links << ["http://1.2.3.4/app1"]
+  $app_links << ["http://1.2.3.4/app2"]
+
 end
 
 # Runs the provided docker and rancher compose files on the cluster
