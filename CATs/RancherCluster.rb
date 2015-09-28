@@ -1,3 +1,118 @@
+######### TEMPORARY STUFF BEGIN #######
+
+### CODE TO GET IP ADDRESS OF GIVEN STACK NAME's LOAD BALANCER ####
+#define get_stack_loadbalancer_ip(@rancher_server) do
+#  $stack_name = "wordpress-1"
+#  $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
+#  $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080/"])
+#  
+#  $projects_url = join([$rancher_ui_uri, "v1/projects"])
+#  
+#  $response = http_get(
+#    url: $projects_url,
+#    headers: { "Content-Type": "application/json"}
+#  )
+#  $body = $response["body"]
+#  $lb_list_url = $body["data"][0]["links"]["loadBalancers"]
+#  
+#  $response = http_get(
+#    url: $lb_list_url,
+#    headers: { "Content-Type": "application/json"}
+#  )
+#  
+#  $body = $response["body"]
+#  $lb_array = $body["data"]
+#  
+#  foreach $lb_spec in $lb_array do
+#    $lb_name = $lb_spec["name"]
+#    if $lb_name =~ $stack_name
+#      call log_this(join(["lb matched: ", to_s($lb_name)]))
+#      $lb_host_url = $lb_spec["links"]["hosts"]
+#      call log_this(join(["lb hosts url: ", to_s($lb_host_url)]))
+#
+#      $response = http_get(
+#        url: $lb_host_url,
+#        headers: { "Content-Type": "application/json"}
+#        )
+#      $body = $response["body"]
+#      
+#      $lb_host_ip_url = $body["data"][0]["links"]["ipAddresses"]
+#      call log_this(join(["lb ipaddress url: ", to_s($lb_host_ip_url)]))
+#      
+#      $response = http_get(
+#        url: $lb_host_ip_url,
+#        headers: { "Content-Type": "application/json"}
+#        )
+#      $body = $response["body"]
+#      $lb_host_ip_address = $body["data"][0]["address"]
+#      call log_this(join(["lb ipaddress: ", to_s($lb_host_ip_address)]))
+#
+#    else
+#      call log_this(join(["lb name not matched: ", $lb_name]))
+#    end
+#      
+#  end
+#  
+#end
+  
+
+
+# NOTES
+#This link is an example of a link that gets you the IP address of the load balancer:
+#http://54.215.24.105:8080/v1/projects/1a5/hosts/1h1/ipaddresses
+#
+#This gets me the load balancers
+#http://54.215.24.105:8080/v1/projects/1a5/loadbalancers
+#
+#This can be searched for the LB name you are looking for and then follow the hosts link
+#http://54.215.24.105:8080/v1/projects/1a5/loadbalancers/1lb1/hosts
+#and follow its ipAddresses link
+#http://54.215.24.105:8080/v1/projects/1a5/hosts/1h1/ipaddresses
+#And note the "address" which is the public IP for where the LB is
+#
+#EXAMPLE of inputs with the YAMLs 
+#define generated_launch(@server_1, @server_array_1)  return @server_1, @server_array_1  do
+#
+#
+#  $inp = {
+#    'RANCHER_ACCESS_KEY':'text:63F1316FEF78482D2BE1',
+#    'RANCHER_COMPOSE_ACCESS_KEY':'text:63F1316FEF78482D2BE1',
+#    'RANCHER_COMPOSE_DOCKER_YAML':'text:nginxlb:^M
+#  ports:^M
+#  - 80:80^M
+#  restart: always^M
+#  tty: true^M
+#  image: rancher/load-balancer-service^M
+#  links:^M
+#  - nginx:nginx^M
+#  stdin_open: true^M
+#nginx:^M
+#  restart: always^M
+#  tty: true^M
+#  image: nginx^M
+#  stdin_open: true',
+#    'RANCHER_COMPOSE_RANCHER_YAML':'text:nginxlb:^M
+#  scale: 1^M
+#  load_balancer_config:^M
+#    name: nginxlb config^M
+#nginx:^M
+#  scale: 1',
+#    'RANCHER_COMPOSE_SECRET_KEY':'text:aWy1iCsn3UFASwvGSqUNcpC48USM3pKP82iSHH8G',
+#    'RANCHER_COMPOSE_URL':'text:http://localhost:8080/',
+#    'RANCHER_SECRET_KEY':'text:aWy1iCsn3UFASwvGSqUNcpC48USM3pKP82iSHH8G',
+#    'RANCHER_URL':'text:http://54.215.24.105:8080/'
+#  }
+#  @@deployment.multi_update_inputs(inputs: $inp)
+#  concurrent return  @server_1, @server_array_1 do
+#    provision(@server_1)
+#    provision(@server_array_1)
+#  end
+#end
+#
+#
+#
+######### TEMPORARY STUFF END ##########
+
 #Copyright 2015 RightScale
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,7 +144,7 @@
 # Allow user to scale out more hosts after launch. (I'm not convinced there is a safe way to allow scaling in.)
 # Support more clouds. This would require coordinating with the ST author to add images in other clouds.
 
-name 'Rancher Cluster'
+name 'Rancher Cluster X'
 rs_ca_ver 20131202
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_logo.jpg) ![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
 
@@ -41,7 +156,7 @@ Clouds Supported: <B>AWS, Google</B>"
 # User inputs    #
 ##################
 parameter "param_location" do 
-  category "Deployment Options"
+  category "Cluster Options"
   label "Cloud" 
   type "string" 
   allowed_values "AWS", "Google" 
@@ -49,13 +164,32 @@ parameter "param_location" do
 end
 
 parameter 'param_qty' do
-  category "Deployment Options"
+  category "Cluster Options"
   type 'number'
   label 'Number of Rancher Hosts'
-  description 'Enter a value from 1 to 4.'
+  description 'Enter a value from 1 to 10.'
   min_value 1
-  max_value 4
-  default 1
+  max_value 10
+  default 3
+end
+
+parameter 'app_stack' do
+  category "Stack Deployment"
+  type "string"
+  label "Application Stack"
+  description "Select an application stack to launch on the Rancher Cluster."
+  allowed_values "WordPress", "Nginx"
+  default "WordPress"
+end
+
+parameter 'app_stack_name' do
+  category "Stack Deployment"
+  type "string"
+  label "Application Stack Name"
+  description "Enter a unique name for the application stack."
+  allowed_pattern '^[a-z0-9]+(\-*[a-z0-9]+)*$'
+  min_length 1
+  constraint_description "Names must be lower case and can include numbers, and \"-\" are allowed."
 end
 
 ################################
@@ -66,6 +200,27 @@ output "rancher_ui_link" do
   category "Rancher UI Access"
   description "Click to access the Rancher UI."
 end
+
+output "application_link" do
+  label "Application Stack Link"
+  category "Output"
+  description "Click to access the application running on the Rancher cluster."
+end
+
+[*1..10].each do |n|
+  output "app_#{n}_name" do
+    label "Application #{n} Name"
+    category "Application Stacks"
+  end
+end
+
+[*1..10].each do |n|
+  output "app_#{n}_link" do
+    label "Application #{n} link"
+    category "Application Stacks"
+  end
+end
+
 
 [*1..10].each do |n|
   output "app_#{n}_name" do
@@ -209,7 +364,7 @@ resource 'rancher_host', type: 'server_array' do
   elasticity_params do {
     "bounds" => {
       "min_count"            => $param_qty,
-      "max_count"            => 4
+      "max_count"            => $param_qty
     },
     "pacing" => {
       "resize_calm_time"     => 5, 
@@ -344,6 +499,35 @@ operation 'launch' do
   } end
 end 
 
+operation 'enable' do
+  description 'Enable an application stack on the Rancher cluster.'
+  definition 'deploy_stack'
+
+  hash = {}
+  [*1..10].each do |n|
+    hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
+    hash[eval("$app_#{n}_name")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
+  end
+
+  output_mappings do 
+    hash
+  end
+end
+
+operation 'Launch an Application Stack' do
+  description "Launch an application stack"
+  definition "deploy_stack"
+  
+  hash = {}
+  [*1..10].each do |n|
+    hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
+    hash[eval("$app_#{n}_name")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
+  end
+
+  output_mappings do 
+    hash
+  end
+end
 
 ##########################
 # DEFINITIONS (i.e. RCL) #
@@ -419,8 +603,118 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   
   # Launch the rancher host array
   provision(@rancher_host)
- 
+
 end 
+
+define deploy_stack(@rancher_server, $app_stack, $app_stack_name) return $app_names, $app_links do
+  
+  $stack_name = $app_stack_name
+  
+# WORDPRESS
+  if $app_stack == "WordPress"
+    # set up the compose files for the WordPress stack
+    $docker_compose = 
+'wordpressapp:
+  restart: always
+  tty: true
+  image: wordpress
+  links:
+  - mysql:mysql
+  stdin_open: true
+loadbalancer:
+  ports:
+  - 80:80
+  restart: always
+  tty: true
+  image: rancher/load-balancer-service
+  links:
+  - wordpressapp:wordpressapp
+  stdin_open: true
+mysql:
+  restart: always
+  environment:
+    MYSQL_ROOT_PASSWORD: mymysqlpassword
+  tty: true
+  image: mysql
+  stdin_open: true'
+    
+    $rancher_compose =
+'wordpressapp:
+  scale: 2
+loadbalancer:
+  scale: 1
+  load_balancer_config:
+    name: loadbalancer config
+mysql:
+  scale: 1'
+    
+# NGINX
+  elsif $app_stack == "Nginx"
+    # set up the compose files for the nginx stack
+    $docker_compose = 
+'nginxlb:
+      ports:
+        - 80:80
+      restart: always
+      tty: true
+      image: rancher/load-balancer-service
+      links:
+        - nginx:nginx
+      stdin_open: true
+nginx:
+      restart: always
+      tty: true
+      image: nginx
+      stdin_open: true'
+    
+    $rancher_compose =
+'nginxlb:
+      scale: 1
+      load_balancer_config:
+        name: nginxlb config
+nginx:
+      scale: 2'
+    
+# Oops
+  else
+    raise "Unknown application stack selected: " + $app_stack
+  end
+  
+  # Launch the stack on the Rancher server
+  call launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_compose) 
+
+  # Now get the link for the application stack just launched on the cluster ... TBD
+  $app_names = []
+  $app_names << ["application-1"]
+  $app_names << ["application-2"]
+  $app_links = []
+  $app_links << ["http://1.2.3.4/app1"]
+  $app_links << ["http://1.2.3.4/app2"]
+
+end
+
+# Runs the provided docker and rancher compose files on the cluster
+define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_compose) do
+  
+  # set up the inputs with the rancher compose and docker compose YAML consumed by Rancher to launch a stack.
+  $inp = {
+    'RANCHER_COMPOSE_PROJECT_NAME':join(['text:', $stack_name]),
+    'RANCHER_COMPOSE_DOCKER_YAML':join(['text:', $docker_compose]),     
+    'RANCHER_COMPOSE_RANCHER_YAML':join(['text:', $rancher_compose])
+  }
+  
+  # Find the script's href
+  $script_name = "Run rancher-compose"
+  @script = rs.right_scripts.get(filter: join(["name==",$script_name]))
+  $right_script_href=@script.href
+  
+  # Run the script on the Rancher Server
+  @task = @rancher_server.current_instance().run_executable(right_script_href: $right_script_href, inputs: $inp)
+  sleep_until(@task.summary =~ "^(completed|Completed|failed|Failed|aborted|Aborted)")
+  if @task.summary =~ "(failed|Failed|aborted|Aborted)"
+    raise "Failed to run RightScript, " + $script_name + " (" + $right_script_href + ")"
+  end 
+end
 
 ####################
 # Helper Functions #
