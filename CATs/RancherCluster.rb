@@ -63,10 +63,23 @@ end
 ################################
 output "rancher_ui_link" do
   label "Rancher UI"
-  category "Output"
+  category "Rancher UI Access"
   description "Click to access the Rancher UI."
 end
 
+[*1..10].each do |n|
+  output "app_#{n}_name" do
+    label "Application #{n} Name"
+    category "Application Stacks"
+  end
+end
+
+[*1..10].each do |n|
+  output "app_#{n}_link" do
+    label "Application #{n} link"
+    category "Application Stacks"
+  end
+end
 
 ##############
 # MAPPINGS   #
