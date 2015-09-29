@@ -144,7 +144,7 @@
 # Allow user to scale out more hosts after launch. (I'm not convinced there is a safe way to allow scaling in.)
 # Support more clouds. This would require coordinating with the ST author to add images in other clouds.
 
-name 'Rancher Cluster X'
+name 'Rancher Cluster'
 rs_ca_ver 20131202
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_logo.jpg) ![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
 
@@ -209,30 +209,15 @@ end
 
 [*1..10].each do |n|
   output "app_#{n}_name" do
-    label "Application #{n} Name"
-    category "Application Stacks"
+    label "Application Name"
+    category "Application #{n}"
   end
 end
 
 [*1..10].each do |n|
   output "app_#{n}_link" do
-    label "Application #{n} link"
-    category "Application Stacks"
-  end
-end
-
-
-[*1..10].each do |n|
-  output "app_#{n}_name" do
-    label "Application #{n} Name"
-    category "Application Stacks"
-  end
-end
-
-[*1..10].each do |n|
-  output "app_#{n}_link" do
-    label "Application #{n} link"
-    category "Application Stacks"
+    label "Application Link"
+    category "Application #{n}"
   end
 end
 
@@ -506,7 +491,7 @@ operation 'enable' do
   hash = {}
   [*1..10].each do |n|
     hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
-    hash[eval("$app_#{n}_name")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
+    hash[eval("$app_#{n}_link")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
   end
 
   output_mappings do 
@@ -521,7 +506,7 @@ operation 'Launch an Application Stack' do
   hash = {}
   [*1..10].each do |n|
     hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
-    hash[eval("$app_#{n}_name")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
+    hash[eval("$app_#{n}_link")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
   end
 
   output_mappings do 
@@ -603,6 +588,7 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   
   # Launch the rancher host array
   provision(@rancher_host)
+   
 
 end 
 
@@ -683,13 +669,8 @@ nginx:
   # Launch the stack on the Rancher server
   call launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_compose) 
 
-  # Now get the link for the application stack just launched on the cluster ... TBD
-  $app_names = []
-  $app_names << ["application-1"]
-  $app_names << ["application-2"]
-  $app_links = []
-  $app_links << ["http://1.2.3.4/app1"]
-  $app_links << ["http://1.2.3.4/app2"]
+  # Now get the list of applications to output 
+  call get_app_lists(@rancher_server) retrieve $app_names, $app_links
 
 end
 
@@ -714,6 +695,58 @@ define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_comp
   if @task.summary =~ "(failed|Failed|aborted|Aborted)"
     raise "Failed to run RightScript, " + $script_name + " (" + $right_script_href + ")"
   end 
+end
+
+# use the Rancher Server API to gather up information about what stacks are running on the cluster
+define get_app_lists(@rancher_server) return $app_names, $app_links do
+  
+  $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
+  $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080/"])
+  
+  $projects_url = join([$rancher_ui_uri, "v1/projects"])
+  
+  $response = http_get(
+    url: $projects_url,
+    headers: { "Content-Type": "application/json"}
+  )
+  $body = $response["body"]
+  $lb_list_url = $body["data"][0]["links"]["loadBalancers"]
+  
+  $response = http_get(
+    url: $lb_list_url,
+    headers: { "Content-Type": "application/json"}
+  )
+  
+  $body = $response["body"]
+  $lb_array = $body["data"]
+  
+  $app_names = [["placeholder"]]
+  $app_links = [["placeholder"]]
+  foreach $lb_spec in $lb_array do
+    $lb_name = $lb_spec["name"]
+    $app_name = split($lb_name, "_")[0] # The stack name is embedded in the load balancer name
+    
+    $lb_host_url = $lb_spec["links"]["hosts"]
+    $response = http_get(
+      url: $lb_host_url,
+      headers: { "Content-Type": "application/json"}
+      )
+    $body = $response["body"]
+    
+    $lb_host_ip_url = $body["data"][0]["links"]["ipAddresses"]
+    
+    $response = http_get(
+      url: $lb_host_ip_url,
+      headers: { "Content-Type": "application/json"}
+      )
+    $body = $response["body"]
+    $lb_host_ip_address = $body["data"][0]["address"]
+    $app_link = "http://" + $lb_host_ip_address
+      
+    $app_names << [$app_name]
+    $app_links << [$app_link]
+  end
+    
 end
 
 ####################
