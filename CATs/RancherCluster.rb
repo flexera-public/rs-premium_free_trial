@@ -173,6 +173,14 @@ parameter 'param_qty' do
   default 3
 end
 
+parameter "num_add_nodes" do
+  category "Cluster Options"
+  type "number"
+  label "Number of Rancher Hosts to Add to the Cluster"
+  description "Enter the number of hosts you want to add to the cluster."
+  default 1
+end
+
 parameter 'app_stack' do
   category "Stack Deployment"
   type "string"
@@ -349,7 +357,7 @@ resource 'rancher_host', type: 'server_array' do
   elasticity_params do {
     "bounds" => {
       "min_count"            => $param_qty,
-      "max_count"            => $param_qty
+      "max_count"            => 10
     },
     "pacing" => {
       "resize_calm_time"     => 5, 
@@ -514,6 +522,25 @@ operation 'Launch an Application Stack' do
   end
 end
 
+operation 'Delete an Application Stack' do
+  description "Delete an application stack"
+  definition "delete_stack"
+  hash = {}
+  [*1..10].each do |n|
+    hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
+    hash[eval("$app_#{n}_link")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
+  end
+
+  output_mappings do 
+    hash
+  end
+end
+
+operation "Add Nodes to Rancher Cluster" do
+  description "Adds (scales out) an application tier server."
+  definition "add_nodes"
+end
+
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
@@ -557,15 +584,12 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
     raise "Rancher Server did not successfully launch."
   end
   
-  # Get the rancher server's IP address
+  # construct the rancher server URL to be used by the Hosts
   $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
   $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080/"])
-    
-  # Call the rancher server API to generate the API keys needed by the hosts and extract them from the response.
-  $response = http_post(
-    url: join([$rancher_ui_uri, "v1/projects/1a5/apikeys"])
-  )
-  $body = $response["body"]
+  
+  # Get the keys from the API
+  call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
   $publicValue = $body["publicValue"] # Public API key
   $secretValue = $body["secretValue"] # Secret API key
     
@@ -669,7 +693,7 @@ nginx:
   # Launch the stack on the Rancher server
   call launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_compose) 
 
-  # Now get the list of applications to output 
+  # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
   call get_app_lists(@rancher_server) retrieve $app_names, $app_links
 
 end
@@ -697,58 +721,132 @@ define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_comp
   end 
 end
 
+# Delete specified application stack
+define delete_stack(@rancher_server, $app_stack_name) return $app_names, $app_links do
+  
+  call rancher_api(@rancher_server, "get", "/v1/projects", "data") retrieve $data_section
+  $envs_url = $data_section[0]["links"]["environments"]
+    
+  call rancher_api(@rancher_server, "get", $envs_url, "data") retrieve $env_array
+
+  foreach $env_spec in $env_array do
+    $env_name = $env_spec["name"]
+    if $env_name == $app_stack_name
+      $env_remove_link = $env_spec["actions"]["remove"]
+      call rancher_api(@rancher_server, "delete", $env_remove_link, "body") retrieve $response
+    end  
+  end
+  
+  # Wait a few seconds for the Rancher server to terminate the application. 
+  # Otherwise if you go and hit the API too quickly afterwards, you'll think the app is still on the cluster
+  sleep(20)
+  
+  # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
+  call get_app_lists(@rancher_server) retrieve $app_names, $app_links
+  
+end
+
+# Add hosts to the cluster
+define add_nodes(@rancher_host, $num_add_nodes) do
+  @task = @rancher_host.launch(count:$num_add_nodes)  
+  
+  $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
+  sleep_until all?(@rancher_host.current_instances().state[], $wake_condition)
+  if !all?(@rancher_host.current_instances().state[], "operational")
+    raise "Some instances failed to start"    
+  end
+end
+
 # use the Rancher Server API to gather up information about what stacks are running on the cluster
 define get_app_lists(@rancher_server) return $app_names, $app_links do
   
-  $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
-  $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080/"])
-  
-  $projects_url = join([$rancher_ui_uri, "v1/projects"])
-  
-  $response = http_get(
-    url: $projects_url,
-    headers: { "Content-Type": "application/json"}
-  )
-  $body = $response["body"]
-  $lb_list_url = $body["data"][0]["links"]["loadBalancers"]
-  
-  $response = http_get(
-    url: $lb_list_url,
-    headers: { "Content-Type": "application/json"}
-  )
-  
-  $body = $response["body"]
-  $lb_array = $body["data"]
-  
+  call rancher_api(@rancher_server, "get", "/v1/projects", "data") retrieve $projects_response
+  $lb_list_url = $projects_response[0]["links"]["loadBalancers"]
+    
+  call rancher_api(@rancher_server, "get", $lb_list_url, "data") retrieve $lb_array
   $app_names = [["placeholder"]]
   $app_links = [["placeholder"]]
-  foreach $lb_spec in $lb_array do
-    $lb_name = $lb_spec["name"]
-    $app_name = split($lb_name, "_")[0] # The stack name is embedded in the load balancer name
-    
-    $lb_host_url = $lb_spec["links"]["hosts"]
-    $response = http_get(
-      url: $lb_host_url,
-      headers: { "Content-Type": "application/json"}
-      )
-    $body = $response["body"]
-    
-    $lb_host_ip_url = $body["data"][0]["links"]["ipAddresses"]
-    
-    $response = http_get(
-      url: $lb_host_ip_url,
-      headers: { "Content-Type": "application/json"}
-      )
-    $body = $response["body"]
-    $lb_host_ip_address = $body["data"][0]["address"]
-    $app_link = "http://" + $lb_host_ip_address
+
+rs.audit_entries.create(auditee_href: @@deployment, summary: "app_names at beginning", detail: to_s($app_names))
+rs.audit_entries.create(auditee_href: @@deployment, summary: "app_links at beginning", detail: to_s($app_links))
+
+
+  
+  if logic_not(empty?($lb_array))  # If note empty then there are some applications to find
+rs.audit_entries.create(auditee_href: @@deployment, summary: "lb_array is not empty", detail: to_s($lb_array))
+
+    foreach $lb_spec in $lb_array do
+rs.audit_entries.create(auditee_href: @@deployment, summary: "starting loop", detail: to_s($lb_spec))
+
+      $lb_name = $lb_spec["name"]
+      $app_name = split($lb_name, "_")[0] # The stack name is embedded in the load balancer name
       
-    $app_names << [$app_name]
-    $app_links << [$app_link]
+      $lb_host_url = $lb_spec["links"]["hosts"]
+        
+      call rancher_api(@rancher_server, "get", $lb_host_url, "data") retrieve $lb_hosts
+      $lb_host_ip_url = $lb_hosts[0]["links"]["ipAddresses"]
+rs.audit_entries.create(auditee_href: @@deployment, summary: "lb_host_ip_url", detail: to_s($lb_host_ip_url))
+
+      call rancher_api(@rancher_server, "get", $lb_host_ip_url, "data") retrieve $lb_host_addresses
+      $lb_host_ip_address = $lb_host_addresses[0]["address"]
+rs.audit_entries.create(auditee_href: @@deployment, summary: "lb_host_ip_address", detail: to_s($lb_host_ip_address))
+
+      $app_link = "http://" + $lb_host_ip_address
+        
+      $app_names << [$app_name]
+      $app_links << [$app_link]
+    end
+  else
+rs.audit_entries.create(auditee_href: @@deployment, summary: "array is empty", detail: to_s($lb_array))
+
+    $app_names << [""]
+    $app_links << [""]
   end
-    
+  
+  
+rs.audit_entries.create(auditee_href: @@deployment, summary: "app_names at end", detail: to_s($app_names))
+rs.audit_entries.create(auditee_href: @@deployment, summary: "app_links at end", detail: to_s($app_links))
+
 end
 
+# Calls the Rancher API and returns the whole "body" of the response or just the "data" section
+define rancher_api(@rancher_server, $action, $api_uri, $message_part_returned) return $api_response do
+  
+  if $api_uri =~ "(http)"  # then we have the full url already
+    $api_url = $api_uri
+  else # we need to construct it
+    # Get the rancher server's IP address    
+    $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
+    $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080"])
+    $api_url = join([$rancher_ui_uri, $api_uri])
+  end
+    
+  # Call the rancher server API 
+  if $action == "post"
+    $response = http_post(
+      url: $api_url
+    )
+  elsif $action == "get"
+    $response = http_get(
+      url: $api_url,
+      headers: { "Content-Type": "application/json"}
+    )
+  elsif $action == "delete"
+    $response = http_delete(
+      url: $api_url,
+      headers: { "Content-Type": "application/json"}
+      )
+  else 
+    raise "Unknown API action: " + $action
+  end
+  
+  $api_response = $response["body"]
+    
+  if $message_part_returned == "data" # drill further into the response and return the data section
+    $api_response = $api_response["data"]
+  end
+
+end
 ####################
 # Helper Functions #
 ####################
