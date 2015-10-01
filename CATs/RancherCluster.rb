@@ -737,9 +737,18 @@ define delete_stack(@rancher_server, $app_stack_name) return $app_names, $app_li
     end  
   end
   
-  # Wait a few seconds for the Rancher server to terminate the application. 
-  # Otherwise if you go and hit the API too quickly afterwards, you'll think the app is still on the cluster
-  sleep(20)
+  $appstack_deleted = false 
+  while logic_not($appstack_deleted) do 
+   sleep(5) # give the cluster a few seconds to clean up   
+   $appstack_deleted = true # assume the best    
+   call rancher_api(@rancher_server, "get", $envs_url, "data") retrieve $env_array
+   foreach $env_spec in $env_array do
+        $env_name = $env_spec["name"]
+        if $env_name == $app_stack_name  # the app (i.e environment) is still being cleaned up
+          $appstack_deleted = false
+        end
+   end
+  end
   
   # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
   call get_app_lists(@rancher_server) retrieve $app_names, $app_links
@@ -752,6 +761,9 @@ define add_nodes(@rancher_host, $num_add_nodes) do
   
   $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
   sleep_until all?(@rancher_host.current_instances().state[], $wake_condition)
+  
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "instance states after waking", detail: to_s(@rancher_host.current_instances().state[]))
+
   if !all?(@rancher_host.current_instances().state[], "operational")
     raise "Some instances failed to start"    
   end
@@ -760,45 +772,57 @@ end
 # use the Rancher Server API to gather up information about what stacks are running on the cluster
 define get_app_lists(@rancher_server) return $app_names, $app_links do
   
-  call rancher_api(@rancher_server, "get", "/v1/projects", "data") retrieve $projects_response
-  $lb_list_url = $projects_response[0]["links"]["loadBalancers"]
-    
-  call rancher_api(@rancher_server, "get", $lb_list_url, "data") retrieve $lb_array
+  # Seed the array for output later
   $app_names = [["placeholder"]]
   $app_links = [["placeholder"]]
-
-rs.audit_entries.create(auditee_href: @@deployment, summary: "app_names at beginning", detail: to_s($app_names))
-rs.audit_entries.create(auditee_href: @@deployment, summary: "app_links at beginning", detail: to_s($app_links))
-
-
   
-  if logic_not(empty?($lb_array))  # If note empty then there are some applications to find
-rs.audit_entries.create(auditee_href: @@deployment, summary: "lb_array is not empty", detail: to_s($lb_array))
+  # Environments = Application Stacks in Rancher
+  # Get list of application stacks
+  call rancher_api(@rancher_server, "get", "/v1/projects", "data") retrieve $projects 
+  $envs_url = $projects[0]["links"]["environments"]
+  call rancher_api(@rancher_server, "get", $envs_url, "data") retrieve $envs_array
 
-    foreach $lb_spec in $lb_array do
-rs.audit_entries.create(auditee_href: @@deployment, summary: "starting loop", detail: to_s($lb_spec))
+  # Make sure there is at least one stack deployed on the cluster
+  if logic_not(empty?($envs_array))  
 
-      $lb_name = $lb_spec["name"]
-      $app_name = split($lb_name, "_")[0] # The stack name is embedded in the load balancer name
+    # Go through each application and gather up the information
+    foreach $env_spec in $envs_array do
+      $lb_host_ip_address = ""
       
-      $lb_host_url = $lb_spec["links"]["hosts"]
+      # Get the stack name
+      $app_name = $env_spec["name"]
         
-      call rancher_api(@rancher_server, "get", $lb_host_url, "data") retrieve $lb_hosts
-      $lb_host_ip_url = $lb_hosts[0]["links"]["ipAddresses"]
-rs.audit_entries.create(auditee_href: @@deployment, summary: "lb_host_ip_url", detail: to_s($lb_host_ip_url))
-
-      call rancher_api(@rancher_server, "get", $lb_host_ip_url, "data") retrieve $lb_host_addresses
-      $lb_host_ip_address = $lb_host_addresses[0]["address"]
-rs.audit_entries.create(auditee_href: @@deployment, summary: "lb_host_ip_address", detail: to_s($lb_host_ip_address))
-
+      # Now drill through the API to get the link to the load balancer in front of the stack.
+      # This code assumes that a Rancher load balancer is deployed.
+        
+      # Loop through the services launched for the given stack
+      $app_services_url = $env_spec["links"]["services"]
+      call rancher_api(@rancher_server, "get", $app_services_url, "data") retrieve $app_services
+      foreach $app_service in $app_services do
+          
+        # We only care about the loadbalancer service
+        if $app_service["type"] == "loadBalancerService"
+          $lb_service_instance_url = $app_service["links"]["instances"]
+          call rancher_api(@rancher_server, "get", $lb_service_instance_url, "data") retrieve $lb_service_instance
+          
+          $lb_service_host_url = $lb_service_instance[0]["links"]["hosts"]
+          call rancher_api(@rancher_server, "get", $lb_service_host_url, "data") retrieve $lb_service_host
+          
+          $lb_service_host_ip_url = $lb_service_host[0]["links"]["ipAddresses"]
+          call rancher_api(@rancher_server, "get", $lb_service_host_ip_url, "data") retrieve $lb_service_host_ip_info
+          
+          # Here's the Easter egg we've been searching for
+          $lb_host_ip_address = $lb_service_host_ip_info[0]["address"]
+        end
+      end
+    
       $app_link = "http://" + $lb_host_ip_address
         
       $app_names << [$app_name]
       $app_links << [$app_link]
+           
     end
-  else
-rs.audit_entries.create(auditee_href: @@deployment, summary: "array is empty", detail: to_s($lb_array))
-
+  else # no stacks so just put some empty data in there
     $app_names << [""]
     $app_links << [""]
   end
