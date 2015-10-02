@@ -89,15 +89,15 @@ end
 # Outputs returned to the user #
 ################################
 output "rancher_ui_link" do
-  label "Rancher UI"
   category "Rancher UI Access"
+  label "Rancher UI Link"
   description "Click to access the Rancher UI."
 end
 
-output "application_link" do
-  label "Application Stack Link"
-  category "Output"
-  description "Click to access the application running on the Rancher cluster."
+output "rancher_infra_link" do
+  category "Rancher UI Access"
+  label "Rancher Infrastructure Page"
+  description "Click to see the Rancher Cluster infrastructure."
 end
 
 [*1..10].each do |n|
@@ -110,6 +110,20 @@ end
 [*1..10].each do |n|
   output "app_#{n}_link" do
     label "Application Link"
+    category "Application #{n}"
+  end
+end
+
+[*1..10].each do |n|
+  output "app_#{n}_graph" do
+    label "Application Graph"
+    category "Application #{n}"
+  end
+end
+
+[*1..10].each do |n|
+  output "app_#{n}_code" do
+    label "Application Rancher and Docker Compose Code"
     category "Application #{n}"
   end
 end
@@ -374,6 +388,7 @@ operation 'launch' do
   definition 'launch_cluster' 
   output_mappings do {
     $rancher_ui_link => $rancher_ui_uri,
+    $rancher_infra_link => $rancher_infra_uri,
   } end
 end 
 
@@ -385,6 +400,8 @@ operation 'enable' do
   [*1..10].each do |n|
     hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
     hash[eval("$app_#{n}_link")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
+    hash[eval("$app_#{n}_graph")] = switch(get(n,$app_graphs),  get(0,get(n,$app_graphs)), "")
+    hash[eval("$app_#{n}_code")] = switch(get(n,$app_codes),  get(0,get(n,$app_codes)), "")
   end
 
   output_mappings do 
@@ -400,6 +417,8 @@ operation 'Launch an Application Stack' do
   [*1..10].each do |n|
     hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
     hash[eval("$app_#{n}_link")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
+    hash[eval("$app_#{n}_graph")] = switch(get(n,$app_graphs),  get(0,get(n,$app_graphs)), "")
+    hash[eval("$app_#{n}_code")] = switch(get(n,$app_codes),  get(0,get(n,$app_codes)), "")
   end
 
   output_mappings do 
@@ -414,6 +433,8 @@ operation 'Delete an Application Stack' do
   [*1..10].each do |n|
     hash[eval("$app_#{n}_name")] = switch(get(n,$app_names),  get(0,get(n,$app_names)), "")
     hash[eval("$app_#{n}_link")] = switch(get(n,$app_links),  get(0,get(n,$app_links)), "")
+    hash[eval("$app_#{n}_graph")] = switch(get(n,$app_graphs),  get(0,get(n,$app_graphs)), "")
+    hash[eval("$app_#{n}_code")] = switch(get(n,$app_codes),  get(0,get(n,$app_codes)), "")
   end
 
   output_mappings do 
@@ -429,7 +450,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec_group_rule_http8080, @sec_group_rule_http80, @sec_group_rule_http443, @sec_group_rule_ssh, @sec_group_rule_udp500, @sec_group_rule_udp4500, $map_cloud, $param_location, $map_st, $needsSshKey, $needsSecurityGroup)  return @rancher_server, @rancher_host, $rancher_ui_uri  do 
+define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec_group_rule_http8080, @sec_group_rule_http80, @sec_group_rule_http443, @sec_group_rule_ssh, @sec_group_rule_udp500, @sec_group_rule_udp4500, $map_cloud, $param_location, $map_st, $needsSshKey, $needsSecurityGroup)  return @rancher_server, @rancher_host, $rancher_ui_uri, $rancher_infra_uri  do 
   
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -472,6 +493,7 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   # construct the rancher server URL to be used by the Hosts
   $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
   $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080/"])
+  $rancher_infra_uri = join([$rancher_ui_uri, "infra/hosts"])
   
   # Get the keys from the API
   call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
@@ -501,7 +523,7 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
 
 end 
 
-define deploy_stack(@rancher_server, $app_stack, $app_stack_name) return $app_names, $app_links do
+define deploy_stack(@rancher_server, $app_stack, $app_stack_name) return $app_names, $app_links, $app_graphs, $app_codes do
   
   $stack_name = $app_stack_name
   
@@ -579,7 +601,7 @@ nginx:
   call launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_compose) 
 
   # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
-  call get_app_lists(@rancher_server) retrieve $app_names, $app_links
+  call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
 
 end
 
@@ -607,7 +629,7 @@ define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_comp
 end
 
 # Delete specified application stack
-define delete_stack(@rancher_server, $app_stack_name) return $app_names, $app_links do
+define delete_stack(@rancher_server, $app_stack_name) return $app_names, $app_links, $app_graphs, $app_codes do
   
   call rancher_api(@rancher_server, "get", "/v1/projects", "data") retrieve $data_section
   $envs_url = $data_section[0]["links"]["environments"]
@@ -636,13 +658,15 @@ define delete_stack(@rancher_server, $app_stack_name) return $app_names, $app_li
   end
   
   # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
-  call get_app_lists(@rancher_server) retrieve $app_names, $app_links
+  call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
   
 end
 
 # Add hosts to the cluster
 define add_nodes(@rancher_host, $num_add_nodes) do
   @task = @rancher_host.launch(count:$num_add_nodes)  
+  
+  sleep(90) # Give the servers a chance to get started before checking for states and problems
   
   $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
   sleep_until all?(@rancher_host.current_instances().state[], $wake_condition)
@@ -655,11 +679,17 @@ define add_nodes(@rancher_host, $num_add_nodes) do
 end
 
 # use the Rancher Server API to gather up information about what stacks are running on the cluster
-define get_app_lists(@rancher_server) return $app_names, $app_links do
+define get_app_lists(@rancher_server) return $app_names, $app_links, $app_graphs, $app_codes do
   
   # Seed the array for output later
   $app_names = [["placeholder"]]
   $app_links = [["placeholder"]]
+  $app_graphs = [["placeholder"]]
+  $app_codes = [["placeholder"]]
+    
+  # Get the rancher server's url - needed to construct the Rancher UI links for each app   
+  $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
+  $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080"])
   
   # Environments = Application Stacks in Rancher
   # Get list of application stacks
@@ -676,6 +706,12 @@ define get_app_lists(@rancher_server) return $app_names, $app_links do
       
       # Get the stack name
       $app_name = $env_spec["name"]
+        
+      # Get the Rancher ID for the stack and create a couple of Rancher UI links for the app
+      $app_id = $env_spec["id"]
+      $app_ui_base_path = join([$rancher_ui_uri, "/apps/", $app_id])
+      $app_graph = join([$app_ui_base_path, "/graph"])
+      $app_code = join([$app_ui_base_path, "/code"])
         
       # Now drill through the API to get the link to the load balancer in front of the stack.
       # This code assumes that a Rancher load balancer is deployed.
@@ -705,16 +741,16 @@ define get_app_lists(@rancher_server) return $app_names, $app_links do
         
       $app_names << [$app_name]
       $app_links << [$app_link]
+      $app_graphs << [$app_graph]
+      $app_codes << [$app_code]
            
     end
   else # no stacks so just put some empty data in there
     $app_names << [""]
     $app_links << [""]
+    $app_graphs << [""]
+    $app_codes << [""]
   end
-  
-  
-rs.audit_entries.create(auditee_href: @@deployment, summary: "app_names at end", detail: to_s($app_names))
-rs.audit_entries.create(auditee_href: @@deployment, summary: "app_links at end", detail: to_s($app_links))
 
 end
 
