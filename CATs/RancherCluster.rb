@@ -23,10 +23,7 @@
 # User can scale out additional Rancher Hosts after launch.
 #
 # TO-DOs
-# Have link go straight to infrastructure in Rancher
-# Add post launch actions to launch some services from Self-Service More Actions menu.
 # Store the API keys in CREDENIALs and use cred: in inputs instead of current clear text approach.
-# Allow user to scale out more hosts after launch. (I'm not convinced there is a safe way to allow scaling in.)
 # Support more clouds. This would require coordinating with the ST author to add images in other clouds.
 
 name 'Rancher Cluster'
@@ -765,21 +762,30 @@ define rancher_api(@rancher_server, $action, $api_uri, $message_part_returned) r
     $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080"])
     $api_url = join([$rancher_ui_uri, $api_uri])
   end
+  
+  # Set up basic auth credentials in case user has enabled access control via the Rancher UI
+  $inputs_array = @rancher_server.current_instance().inputs()
+  $username = split($inputs_array[0]["RANCHER_COMPOSE_ACCESS_KEY"], ":")[1]
+  $password = split($inputs_array[0]["RANCHER_COMPOSE_SECRET_KEY"], ":")[1]
     
   # Call the rancher server API 
   if $action == "post"
     $response = http_post(
-      url: $api_url
+      url: $api_url,
+      headers: { "Content-Type": "application/json"},
+      basic_auth: { username: $username, password: $password }
     )
   elsif $action == "get"
     $response = http_get(
       url: $api_url,
-      headers: { "Content-Type": "application/json"}
+      headers: { "Content-Type": "application/json"},
+      basic_auth: { username: $username, password: $password }
     )
   elsif $action == "delete"
     $response = http_delete(
       url: $api_url,
-      headers: { "Content-Type": "application/json"}
+      headers: { "Content-Type": "application/json"},
+      basic_auth: { username: $username, password: $password }
       )
   else 
     raise "Unknown API action: " + $action
