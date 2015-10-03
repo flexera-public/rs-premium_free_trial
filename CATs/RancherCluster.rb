@@ -55,6 +55,25 @@ parameter 'param_qty' do
   default 3
 end
 
+# Just hardcoding the rancher creds for now to make things easier for the user
+#parameter "rancher_ui_username" do
+#  category "Cluster Options"
+#  type "string"
+#  label "Rancher UI Username"
+#  description "Enter username for Rancher UI"
+#  default "rightscale"
+#end
+#
+#parameter "rancher_ui_password" do
+#  category "Cluster Options"
+#  type "string"
+#  label "Rancher UI Password"
+#  description "Enter password for Rancher UI. (Leave blank for default password \"rightscale\".)"
+#  default "rightscale"
+#  no_echo "true"
+#end
+
+
 parameter "num_add_nodes" do
   category "Cluster Options"
   type "number"
@@ -88,7 +107,7 @@ end
 output "rancher_ui_link" do
   category "Rancher UI Access"
   label "Rancher UI Link"
-  description "Click to access the Rancher UI."
+  description "Click to access the Rancher UI.(NOTE: username/passsword = \"rightscale\")"
 end
 
 output "rancher_infra_link" do
@@ -516,6 +535,9 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   
   # Launch the rancher host array
   provision(@rancher_host)
+  
+  # Now enable local authentication with username and password = rightscale
+  call enable_rancher_auth(@rancher_server, "rightscale", "rightscale")
    
 
 end 
@@ -749,6 +771,29 @@ define get_app_lists(@rancher_server) return $app_names, $app_links, $app_graphs
     $app_codes << [""]
   end
 
+end
+
+# Creates a local username/password on the Rancher Server
+# This is mostly done to get rid of the annoying banner about no access configured.
+define enable_rancher_auth(@rancher_server, $username, $password) do
+  $post_body = {
+     "type": "localAuthConfig",
+     "accessMode": "unrestricted",
+     "enabled": true,
+     "name": "RightScale",
+     "username": $username,
+     "password": $password
+     }
+     
+  $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
+  $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080"])
+  $api_url = join([$rancher_ui_uri, "/v1/localauthconfigs"])
+  
+  $response = http_post(
+    url: $api_url,
+    headers: { "Content-Type": "application/json"},
+    body: $post_body
+  )
 end
 
 # Calls the Rancher API and returns the whole "body" of the response or just the "data" section
