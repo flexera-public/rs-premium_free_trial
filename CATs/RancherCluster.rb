@@ -254,6 +254,12 @@ resource 'rancher_server', type: 'server' do
   security_group_hrefs map($map_cloud, $param_location, "sg") 
   server_template find(map($map_st, "server", "name"), revision: map($map_st, "server", "rev"))
   multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
+  inputs do {
+    # Set the Route53 inputs to not use it.
+    "ROUTE_53_UPDATE_RECORD" => "text:false",
+    "ROUTE_53_AWS_ACCESS_KEY_ID" => "text:unused",
+    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused"
+  } end
 end
 
 resource 'rancher_host', type: 'server_array' do
@@ -266,6 +272,12 @@ resource 'rancher_host', type: 'server_array' do
   security_group_hrefs map($map_cloud, $param_location, "sg") 
   server_template find(map($map_st, "host", "name"), revision: map($map_st, "host", "rev"))
   multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
+  inputs do {
+    # Set the Route53 inputs to not use it.
+    "ROUTE_53_UPDATE_RECORD" => "text:false",
+    "ROUTE_53_AWS_ACCESS_KEY_ID" => "text:unused",
+    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused"
+  } end  
   # Server Array Settings
   state "enabled"
   array_type "alert"
