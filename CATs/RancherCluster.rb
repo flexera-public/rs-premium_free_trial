@@ -151,7 +151,7 @@ end
 # Mapping and abstraction of cloud-related items.
 mapping "map_cloud" do {
   "AWS" => {
-    "cloud" => "EC2 us-west-1",
+    "cloud" => "EC2 us-east-1",
     "zone" => null, # We don't care which az AWS decides to use.
     "instance_type" => "m3.medium",
     "sg" => '@sec_group',  
