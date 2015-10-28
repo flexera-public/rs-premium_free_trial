@@ -1,3 +1,4 @@
+DEPRECATED - the AppStack_CpuRamDriven CAT is taking the place of this one in the PFT portfolio.
 #Copyright 2015 RightScale
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
