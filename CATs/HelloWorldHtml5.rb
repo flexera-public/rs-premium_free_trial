@@ -1,4 +1,7 @@
-DEPRECATED - the AppStack_CpuRamDriven CAT is taking the place of this one in the PFT portfolio.
+#######
+# DEPRECATED - the AppStack_CpuRamDriven CAT is taking the place of this one in the PFT portfolio.
+#######
+
 #Copyright 2015 RightScale
 #
 #Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,7 +29,7 @@ DEPRECATED - the AppStack_CpuRamDriven CAT is taking the place of this one in th
 
 
 # Required prolog
-name 'D) Hello World Web Site'
+name 'D) Hello World Web Site - DEPRECATED'
 rs_ca_ver 20131202
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/html5.png)
 

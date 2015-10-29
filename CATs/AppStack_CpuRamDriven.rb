@@ -21,7 +21,7 @@
 # 
 # TO-DOs
 # Add support for EBS-backed instance types in AWS.
-#
+# Improve formatting of the cloud cost info outputs.
 
 
 # Required prolog
@@ -486,24 +486,6 @@ define launch_servers(@lb, @web_tier, @ssh_key, @sec_group, @sec_group_rule_http
   end
   @lb = $lb_hash  
   @web_tier = $webtier_hash
-    
-#  else # just use the provided location and stuff
-#  
-#    # Provision the SSH key if applicable.
-#    if ($param_location == "AWS") 
-#      provision(@ssh_key)
-#    end
-#    
-#    # Provision the security group rules if applicable. (The security group itself is created when the server is provisioned.)
-#    if logic_or($param_location == "AWS", $param_location == "Google")
-#      provision(@sec_group_rule_http)
-#    end
-#    
-#    # Provision the placement group if applicable
-#    if ($param_location == "Azure")
-#      provision(@placement_group)
-#    end
-#  end
 
   # Provision the servers (concurrently)
   concurrent return @lb, @web_tier do
@@ -583,17 +565,6 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      $numcpu = $numcpu + 1
    end
    
-#   $memory_array = []
-#   $ram_increments = [".0", ".1", ".2", ".25", ".3", ".4", ".5", ".6", ".7", ".75", ".8", ".9"] # different clouds have different variations on the theme
-#   $numram = to_n($param_ram)
-#   $maxram = $numram + 8
-#   while $numram <= $maxram do
-#     foreach $ram_increment in $ram_increments do
-#       $memory_array << to_s($numram)+$ram_increment
-#     end
-#     $numram = $numram + 1
-#   end
-              
    # pricing filters
    $filter = {
      public_cloud_vendor_name: $cloud_provider_filter,
