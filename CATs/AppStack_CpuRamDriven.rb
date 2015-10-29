@@ -605,8 +605,8 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      # But we need to avoid looking at AWS EBS-backed instance types since we currently use an MCI that requires ephemeral disk based instance types in AWS.
      # Also the Google price_hash does not have a local_disk_size attribute so we can't just look at that.
      # Hence a multidimensional condition test
-     if logic_or(logic_or($found_public_cloud_vendor == "Google", $found_public_cloud_vendor == "Microsoft Azure"), logic_and($found_public_cloud_vendor == "Amazon Web Services", $price_hash["priceable_resource"]["local_disk_size"] != "0.0"))
-#           call audit_log(join(["price_hash for ", $found_public_cloud_vendor]), to_s($price_hash))
+     if logic_or(logic_or($found_public_cloud_vendor == "Google", $found_public_cloud_vendor == "Microsoft Azure"), logic_and($found_public_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
+#           call audit_log(join(["found a valid price_hash for ", $found_public_cloud_vendor]), to_s($price_hash))
 
        $purchase_options = keys($price_hash["purchase_option"])
          
