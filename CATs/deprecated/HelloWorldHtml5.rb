@@ -29,7 +29,7 @@
 
 
 # Required prolog
-name 'D) Hello World Web Site - DEPRECATED'
+name 'D) Hello World Web Site'
 rs_ca_ver 20131202
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/html5.png)
 
