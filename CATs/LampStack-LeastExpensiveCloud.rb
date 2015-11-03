@@ -47,7 +47,7 @@ parameter "param_cpu" do
   label "Minimum Number of vCPUs" 
   type "string" 
   description "Minimum number of vCPUs needed for the application." 
-  default "2"
+  default "1"
 end
 
 parameter "param_ram" do 
@@ -82,12 +82,10 @@ output "lb_status" do
   description "Accesses Load Balancer status page"
 end
 
-#output "vmware_note" do
-#  condition $invSphere
-#  label "Deployment Note"
-#  category "Output"
-#  default_value "Your CloudApp was deployed in a VMware environment on a private network and so is not directly accessible. If you need access to the CloudApp, please contact your RightScale rep for network access."
-#end
+output "vmware_note" do
+  label "Deployment Note"
+  category "Output"
+end
 
 output "selected_cloud" do
   label "Selected Cloud" 
@@ -215,7 +213,7 @@ mapping "map_cloud" do {
   "Google" => {
     "cloud_provider" => "Google",
     "cloud_type" => "google",
-    "zone" => null, # Google requires a zone to be specified at launch. The zone href will be obtained when it's cheapest instance type and related datacenter is identfied below.
+    "zone" => "needs-a-datacenter", # Google requires a zone to be specified at launch. The zone href will be obtained when it's cheapest instance type and related datacenter is identfied below.
     "sg" => '@sec_group',  
     "ssh_key" => null,
     "pg" => null,
@@ -489,6 +487,7 @@ operation "launch" do
   output_mappings do {
     $site_url => $site_link,
     $lb_status => $lb_status_link,
+    $vmware_note => $vmware_note_text,  # only gets populated if deployed in VMware
     $selected_cloud => $cheapest_cloud,
     $hourly_app_cost => $app_cost,
     $aws_cloud_output => $aws_cloud,
@@ -514,17 +513,23 @@ end
 operation "Scale Out" do
   description "Adds (scales out) an application tier server."
   definition "scale_out_array"
+  output_mappings do {
+    $hourly_app_cost => $app_cost
+  } end
 end
 
 operation "Scale In" do
   description "Scales in an application tier server."
   definition "scale_in_array"
+  output_mappings do {
+    $hourly_app_cost => $app_cost
+  } end
 end
 
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_db_creds, $param_cpu, $param_ram)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, $site_link, $lb_status_link, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
+define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
 
   # Find and import the server template - just in case it hasn't been imported to the account already
   call importServerTemplate($map_st)
@@ -577,10 +582,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   call audit_log(join(["cheapest cloud: ",$cheapest_cloud]), "")
 
   foreach $cloud in keys($map_cloud) do
-    call audit_log(join(["cloud in map_cloud: ", $cloud]), "")
-
     if $cheapest_cloud == map($map_cloud, $cloud, "cloud_provider")
-      call audit_log(join(["setting param_location to: ", $cloud]), "")
       $param_location = $cloud
     end
   end
@@ -592,43 +594,70 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   # Create credentials used to access the MySQL database as part of the CAT to make it more portable.
   call createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
     
-# modify resources with the cheapest cloud
-#$resource_hash = to_object(@ssh_key)
-#$resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-#@ssh_key = $resource_hash
-#
-#$resource_hash = to_object(@sec_group)
-#$resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-#@sec_group = $resource_hash   
-#
-#$resource_hash = to_object(@placement_group)
-#$resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-#@placement_group = $resource_hash  
-#
-#$lb_hash = to_object(@lb)
-#$lb_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-#$lb_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href
-#  
-#$webtier_hash = to_object(@web_tier)
-#$webtier_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-#$webtier_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href
-#    
-  # Provision the SSH key if applicable.
-  if $needsSshKey
-    provision(@ssh_key)
+  # find the MCI to use based on which cloud was selected.
+  @multi_cloud_image = find("multi_cloud_images", map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
+  $multi_cloud_image_href = @multi_cloud_image.href
+    
+  # modify resources with the cheapest cloud
+  $resource_hash = to_object(@ssh_key)
+  $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
+  @ssh_key = $resource_hash
+  
+  $resource_hash = to_object(@sec_group)
+  $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
+  @sec_group = $resource_hash   
+  
+  $resource_hash = to_object(@placement_group)
+  $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
+  @placement_group = $resource_hash  
+  
+  $lb_hash = to_object(@lb_server)
+  $lb_hash["fields"]["cloud_href"] = $cheapest_cloud_href
+  $lb_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
+  $lb_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href
+    
+  $webtier_hash = to_object(@app_server)
+  $webtier_hash["fields"]["cloud_href"] = $cheapest_cloud_href
+  $webtier_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
+  $webtier_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href
+    
+  $db_hash = to_object(@db_server)
+  $db_hash["fields"]["cloud_href"] = $cheapest_cloud_href
+  $db_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
+  $db_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href      
+    
+  if map($map_cloud, $param_location, "zone")   
+    $lb_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
+    $webtier_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
+    $db_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
   end
   
-  # Provision the security group rules if applicable. (The security group itself is created when the server is provisioned.)
-  if $needsSecurityGroup
+  if map($map_cloud, $param_location, "ssh_key")
+    provision(@ssh_key)
+    $lb_hash["fields"]["ssh_key_href"] = @ssh_key.href
+    $webtier_hash["fields"]["ssh_key_href"] = @ssh_key.href
+    $db_hash["fields"]["ssh_key_href"] = @ssh_key.href
+  end
+  
+  if map($map_cloud, $param_location, "pg")
+    provision(@placement_group)
+    $lb_hash["fields"]["placement_group_href"] = @placement_group.href
+    $webtier_hash["fields"]["placement_group_href"] = @placement_group.href
+    $db_hash["fields"]["placement_group_href"] = @placement_group.href
+  end
+  
+  if map($map_cloud, $param_location, "sg")
     provision(@sec_group_rule_http)
     provision(@sec_group_rule_http8080)
     provision(@sec_group_rule_mysql)
+    $lb_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
+    $webtier_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
+    $db_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
   end
   
-  # Provision the placement group if applicable
-  if $needsPlacementGroup
-    provision(@placement_group)
-  end
+  @lb_server = $lb_hash  
+  @app_server = $webtier_hash
+  @db_server = $db_hash
   
   # Launch the servers concurrently
   concurrent return  @lb_server, @app_server, @db_server do 
@@ -682,17 +711,18 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
     
   # If deployed in Azure one needs to provide the port mapping that Azure uses.
-  if $inAzure
+  if $param_location == "Azure"
      @bindings = rs.clouds.get(href: @lb_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @lb_server.current_instance().href])
      @binding = select(@bindings, {"private_port":80})
      $server_addr = join([to_s(@lb_server.current_instance().public_ip_addresses[0]), ":", @binding.public_port])
   else
-    if $invSphere  # Use private IP for VMware envs
+    if $param_location == "VMware"  # Use private IP for VMware envs
         # Wait for the server to get the IP address we're looking for.
         while equals?(@lb_server.current_instance().private_ip_addresses[0], null) do
           sleep(10)
         end
         $server_addr =  to_s(@lb_server.current_instance().private_ip_addresses[0])
+        $vmware_note_text = "Your CloudApp was deployed in a VMware environment on a private network and so is not directly accessible."
     else
         # Wait for the server to get the IP address we're looking for.
         while equals?(@lb_server.current_instance().public_ip_addresses[0], null) do
@@ -703,6 +733,9 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   end
   $site_link = join(["http://", $server_addr, "/dbread"])
   $lb_status_link = join(["http://", $server_addr, "/haproxy-status"])
+    
+  call calc_app_cost(@app_server) retrieve $app_cost
+
 end 
 
 # Install a new branch of app code to change colors and some text on the webpage.
@@ -729,7 +762,7 @@ define install_appcode($param_appcode, @app_server) do
 end
 
 # Scale out (add) server
-define scale_out_array(@app_server, @lb_server) do
+define scale_out_array(@app_server, @lb_server) return $app_cost do
   task_label("Scale out application server.")
   @task = @app_server.launch(inputs: {})
 
@@ -747,11 +780,14 @@ define scale_out_array(@app_server, @lb_server) do
   
   # Tell the load balancer to find the new app server
   call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
+    
+  call calc_app_cost(@app_server) retrieve $app_cost
+
 
 end
 
 # Scale in (remove) server
-define scale_in_array(@app_server) do
+define scale_in_array(@app_server) return $app_cost do
   task_label("Scale in web server array.")
 
   @terminable_servers = select(@app_server.current_instances(), {"state":"/^(operational|stranded)/"})
@@ -767,6 +803,9 @@ define scale_in_array(@app_server) do
   else
     rs.audit_entries.create(audit_entry: {auditee_href: @app_server.href, summary: "Scale In: No terminable server currently found in the server array"})
   end
+  
+  call calc_app_cost(@app_server) retrieve $app_cost
+
 end
 
 ####################
@@ -857,6 +896,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
       "cloud_href": "",
       "instance_type": "",
       "instance_type_href": "",
+      "datacenter_name": "",
       "datacenter_href": ""
     }
     $cloud_href_filter = []
@@ -867,11 +907,8 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
   
       # Seed the cloud hash 
       $cloud_costs_hash[$cloud_vendor_name] = $cloud_info
-#      $cloud_costs_hash[$cloud_vendor_name]["datacenter_href"] = map($map_cloud, $cloud, "zone")
-#      if map($map_cloud, $cloud, "zone") # we have a known datacenter we will use
-#        $datacenter_href = @cloud.datacenters(filter: [join(["name==",map($map_cloud, $cloud, "zone")])]).href
-#        $cloud_costs_hash[$cloud_vendor_name]["datacenter_href"] = $datacenter_href
-#      end
+      # add in the datacenter_name if it's in the cloud mapping
+      $cloud_costs_hash[$cloud_vendor_name]["datacenter_name"] = map($map_cloud, $cloud, "zone")
    
       # Build a cloud provider filter for the api call below.
       # No longer needed since we build a filter of clouds/regions.
@@ -896,7 +933,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
    # pricing filters
    $filter = {
 #     public_cloud_vendor_name: $cloud_provider_filter,  
-     cloud_href: ["/api/clouds/3152"], #$cloud_href_filter,
+     cloud_href: $cloud_href_filter,
      cpu_count: $cpu_count_array,
      resource_type: ["instance"],
      purchase_option_type: ["on_demand_instance"],
@@ -907,7 +944,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
    call audit_log(join(["pricing filter: "]), to_s($filter))
            
    # Get an array of price hashes for the given filters
-  $response = http_request(
+   $response = http_request(
      verb: "get",
      host: "pricing.rightscale.com",
      https: true,
@@ -934,7 +971,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
         $found_cloud_vendor = "VMware"
      end
          
-     call audit_log(join(["found vendor: ", $found_cloud_vendor]), "")
+#     call audit_log(join(["found vendor: ", $found_cloud_vendor]), "")
 
      
      # We are ok with any Google or Azure type.
@@ -969,8 +1006,11 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
            $instance_type = $price_hash["priceable_resource"]["name"]
            @cloud = rs.clouds.get(href: $cloud_href)
            $instance_type_href = @cloud.instance_types(filter: [join(["name==",$instance_type])]).href
-           if contains?($purchase_options, ["datacenter_name"])  # then overwrite the datacenter with that provided in the pricing info
+           if contains?($purchase_options, ["datacenter_name"])  # then set the datacenter with that provided in the pricing info
               $datacenter_name = $price_hash["purchase_option"]["datacenter_name"]
+              $datacenter_href = @cloud.datacenters(filter: [join(["name==",$datacenter_name])]).href
+           elsif $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"]  # then use the datacenter we set in the cloud map
+              $datacenter_name = $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"]
               $datacenter_href = @cloud.datacenters(filter: [join(["name==",$datacenter_name])]).href
            end
            $cloud_info = {
@@ -1000,7 +1040,7 @@ define calc_app_cost(@web_tier) return $app_cost do
   $tag_array = $tags[0][0]['tags']
   $cost_tagged = false
   foreach $tag_item in $tag_array do
-    if $tag_item['name'] =~ /hello_world:instancecost/
+    if $tag_item['name'] =~ /instancecost/
       $tag = $tag_item['name']
       $instance_cost = to_n(split($tag, "=")[1])
     end
@@ -1010,7 +1050,7 @@ define calc_app_cost(@web_tier) return $app_cost do
     # see how many web server instances there are
     @web_servers = select(@web_tier.current_instances(), {"state":"/^(operational|stranded)/"})
     $num_web_servers = size(@web_servers)
-    $calculated_app_cost = ($num_web_servers + 1) * $instance_cost  # add one to the number of web servers to account for the load balancer
+    $calculated_app_cost = ($num_web_servers + 2) * $instance_cost  # add two to the number of web servers to account for the load balancer and mysql servers
     $app_cost = to_s($calculated_app_cost)
   end
   
