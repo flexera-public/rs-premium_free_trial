@@ -30,7 +30,7 @@ short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/best_price.
 Launches a scalable LAMP stack that supports application code updates in least expensive PUBLIC or PRIVATE cloud based on user-specified CPU and RAM."
 long_description "Launches a 3-tier LAMP stack in the least expensive environment based on user-specified CPU and RAM requirements.\n
 Clouds Supported: <B>AWS, Azure, Google, VMware</B>\n
-Pro Tip: Select CPU=1 and RAM=1 to get to our VMware environment."
+Pro Tip: Select CPU=1 and RAM=1 to end up in the VMware environment."
 
 ##################
 # User inputs    #
