@@ -223,7 +223,7 @@ mapping "map_cloud" do {
   "VMware" => {
     "cloud_provider" => "VMware",
     "cloud_type" => "vscale",
-    "zone" => "POC-vSphere-Zone-1", # launches in vSphere require a zone being specified.
+    "zone" => "PFT_VMware_Zone", # launches in vSphere require a zone being specified.
     "sg" => null, 
     "ssh_key" => "@ssh_key",
     "pg" => null,
