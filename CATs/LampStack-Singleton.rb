@@ -121,8 +121,8 @@ mapping "map_cloud" do {
     "mci_mapping" => "Public",
   },
   "VMware" => {
-    "cloud" => "VMware PFT",
-    "zone" => "PFT_VMware_Zone", # launches in vSphere require a zone being specified
+    "cloud" => "VMware Private Cloud",
+    "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified
     "instance_type" => "large",
     "sg" => null,
     "ssh_key" => "@ssh_key",
