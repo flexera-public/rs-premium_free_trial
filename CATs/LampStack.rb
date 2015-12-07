@@ -50,6 +50,14 @@ parameter "param_appcode" do
   operations "Update Application Code"
 end
 
+parameter "param_costcenter" do 
+  category "Deployment Options"
+  label "Cost Center ID" 
+  type "string" 
+  allowed_values "CC1", "CC2", "CC3" 
+  default "CC1"
+end
+
 ################################
 # Outputs returned to the user #
 ################################
@@ -435,7 +443,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_db_creds, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, $site_link, $lb_status_link do 
+define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $map_db_creds, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, $site_link, $lb_status_link do 
 
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -520,6 +528,11 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   # This must run after the tagging is complete, so it is done outside the concurrent block above.
   call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
     
+  # Now tag the servers with the selected project cost center ID.
+  $tags=[join(["costcenter:id=",$param_costcenter])]
+  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  rs.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
+
   # If deployed in Azure one needs to provide the port mapping that Azure uses.
   if $inAzure
      @bindings = rs.clouds.get(href: @lb_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @lb_server.current_instance().href])
@@ -568,7 +581,7 @@ define install_appcode($param_appcode, @app_server) do
 end
 
 # Scale out (add) server
-define scale_out_array(@app_server, @lb_server) do
+define scale_out_array(@app_server, @lb_server, $param_costcenter) do
   task_label("Scale out application server.")
   @task = @app_server.launch(inputs: {})
 
@@ -586,6 +599,10 @@ define scale_out_array(@app_server, @lb_server) do
   
   # Tell the load balancer to find the new app server
   call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
+    
+  # Apply the cost center tag to the server array instance(s)
+  $tags=[join(["costcenter:id=",$param_costcenter])]
+  rs.tags.multi_add(resource_hrefs: @app_server.current_instances().href[], tags: $tags)
 
 end
 
