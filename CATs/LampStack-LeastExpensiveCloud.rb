@@ -889,36 +889,37 @@ end
 # Calculate the cost of using the different clouds found in the $map_cloud mapping
 define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_hash do
   
-    $cloud_costs_hash = {}
-    # Seed the cloud info
-    $cloud_info = {
-      "price": 10000,
-      "cloud_name": "",
-      "cloud_href": "",
-      "instance_type": "",
-      "instance_type_href": "",
-      "datacenter_name": "",
-      "datacenter_href": ""
-    }
-    $cloud_href_filter = []
-    $cloud_provider_filter = []
-    foreach $cloud in keys($map_cloud) do
-      
-      $cloud_vendor_name = map($map_cloud, $cloud, "cloud_provider")
-  
-      # Seed the cloud hash 
-      $cloud_costs_hash[$cloud_vendor_name] = $cloud_info
-      # add in the datacenter_name if it's in the cloud mapping
-      $cloud_costs_hash[$cloud_vendor_name]["datacenter_name"] = map($map_cloud, $cloud, "zone")
-   
-      # Build a cloud provider filter for the api call below.
-      # No longer needed since we build a filter of clouds/regions.
+  $cloud_costs_hash = {}
+  $supported_instance_types_hash = {}
+  # Seed the cloud info
+  $cloud_info = {
+    "price": 10000,
+    "cloud_name": "",
+    "cloud_href": "",
+    "instance_type": "",
+    "instance_type_href": "",
+    "datacenter_name": "",
+    "datacenter_href": ""
+  }
+  $cloud_href_filter = []
+  $cloud_provider_filter = []
+  foreach $cloud in keys($map_cloud) do
+    
+    $cloud_vendor_name = map($map_cloud, $cloud, "cloud_provider")
+
+    # Seed the cloud hash 
+    $cloud_costs_hash[$cloud_vendor_name] = $cloud_info
+    # add in the datacenter_name if it's in the cloud mapping
+    $cloud_costs_hash[$cloud_vendor_name]["datacenter_name"] = map($map_cloud, $cloud, "zone")
+ 
+    # Build a cloud provider filter for the api call below.
+    # No longer needed since we build a filter of clouds/regions.
 #      $cloud_provider_filter << $cloud_vendor_name
-      
-      # Build up a list of cloud hrefs for the pricing filter below
-      $cloud_href_array = rs.clouds.get(filter: join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")])).href[]
-      $cloud_href_filter = $cloud_href_filter + $cloud_href_array
-    end
+    
+    # Build up a list of cloud hrefs for the pricing filter below
+    $cloud_href_array = rs.clouds.get(filter: join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")])).href[]
+    $cloud_href_filter = $cloud_href_filter + $cloud_href_array
+  end
   
   call audit_log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
 
@@ -990,40 +991,46 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
        if $memory >= to_n($ram_count)
          # then it's a contender
        
-         # There may be more than one usage_charge elements in the returned array. So find one that is NOT an option since this is the base price we'll be using
-         $price = ""
-         foreach $usage_charge in $price_hash["usage_charges"] do
-           if $usage_charge["option"] == false
-              $price = $usage_charge["price"]
-
-#              call audit_log(join(["Found price for ", $found_cloud_vendor, "; price: ", $price]), to_s($price_hash))
+           # There may be more than one usage_charge elements in the returned array. So find one that is NOT an option since this is the base price we'll be using
+           $price = ""
+           foreach $usage_charge in $price_hash["usage_charges"] do
+             if $usage_charge["option"] == false
+                $price = $usage_charge["price"]
+  
+  #              call audit_log(join(["Found price for ", $found_cloud_vendor, "; price: ", $price]), to_s($price_hash))
+             end
            end
-         end
-         
-         # Did we find a cheaper price?
-         if to_n($price) < $cloud_costs_hash[$found_cloud_vendor]["price"]
-           $cloud_best_price = to_n($price)
-           $cloud_href = $price_hash["purchase_option"]["cloud_href"]
-           $instance_type = $price_hash["priceable_resource"]["name"]
-           @cloud = rs.clouds.get(href: $cloud_href)
-           $instance_type_href = @cloud.instance_types(filter: [join(["name==",$instance_type])]).href
-           if contains?($purchase_options, ["datacenter_name"])  # then set the datacenter with that provided in the pricing info
-              $datacenter_name = $price_hash["purchase_option"]["datacenter_name"]
-              $datacenter_href = @cloud.datacenters(filter: [join(["name==",$datacenter_name])]).href
-           elsif $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"]  # then use the datacenter we set in the cloud map
-              $datacenter_name = $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"]
-              $datacenter_href = @cloud.datacenters(filter: [join(["name==",$datacenter_name])]).href
-           end
-           $cloud_info = {
-             "price": $cloud_best_price,
-             "cloud_name": @cloud.name,
-             "cloud_href": $cloud_href,
-             "instance_type": $instance_type,
-             "instance_type_href": $instance_type_href,
-             "datacenter_href": $datacenter_href
-           }
-           $cloud_costs_hash[$found_cloud_vendor] = $cloud_info
-        end # price comparison
+           
+           # Is it cheapest so far?
+           if to_n($price) < $cloud_costs_hash[$found_cloud_vendor]["price"]
+             
+             # Even if it's cheaper, make sure it's a supported instance type 
+             call checkInstanceType($price_hash["purchase_option"]["cloud_href"], $price_hash["priceable_resource"]["name"], $supported_instance_types_hash) retrieve $supported_instance_types_hash, $usableInstanceType
+             if $usableInstanceType # the pricing API returned an instance type that is supported for the account
+             
+               $cloud_best_price = to_n($price)
+               $cloud_href = $price_hash["purchase_option"]["cloud_href"]
+               $instance_type = $price_hash["priceable_resource"]["name"]
+               @cloud = rs.clouds.get(href: $cloud_href)
+               $instance_type_href = @cloud.instance_types(filter: [join(["name==",$instance_type])]).href
+               if contains?($purchase_options, ["datacenter_name"])  # then set the datacenter with that provided in the pricing info
+                  $datacenter_name = $price_hash["purchase_option"]["datacenter_name"]
+                  $datacenter_href = @cloud.datacenters(filter: [join(["name==",$datacenter_name])]).href
+               elsif $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"]  # then use the datacenter we set in the cloud map
+                  $datacenter_name = $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"]
+                  $datacenter_href = @cloud.datacenters(filter: [join(["name==",$datacenter_name])]).href
+               end
+               $cloud_info = {
+                 "price": $cloud_best_price,
+                 "cloud_name": @cloud.name,
+                 "cloud_href": $cloud_href,
+                 "instance_type": $instance_type,
+                 "instance_type_href": $instance_type_href,
+                 "datacenter_href": $datacenter_href
+               }
+               $cloud_costs_hash[$found_cloud_vendor] = $cloud_info
+             end # usable instance type check
+           end # price comparison
        end # RAM check
      end # EBS-backed instance type test
    end # price_hash loop
@@ -1056,6 +1063,29 @@ define calc_app_cost(@web_tier) return $app_cost do
   end
   
 end
+
+# Checks instance type to see if it is supported by the given, attached cloud
+define checkInstanceType($cloud_href, $instance_type, $supported_instance_types_hash) return $supported_instance_types_hash, $usableInstanceType do
+  
+  # add instance types for the cloud_href if not already in the instance types hash
+  if logic_not($supported_instance_types_hash[$cloud_href])
+
+    @cloud=rs.clouds.get(href: $cloud_href)
+    @instance_types = @cloud.instance_types().get()
+    $instance_type_names=@instance_types.name[]
+    $supported_instance_types_hash[$cloud_href] = $instance_type_names
+    
+#    call audit_log(join(["Gathered instance types for cloud, ", $cloud_href]), to_s($instance_type_names))
+  end
+  
+  # Check if the instance type found in the pricing API is a supported instance type
+  $usableInstanceType = contains?($supported_instance_types_hash[$cloud_href], [$instance_type])
+  
+#  if logic_not($usableInstanceType)
+#    call audit_log(join(["Found unsupported instance type, ", to_s($instance_type), " in cloud, ", to_s($cloud_href)]), "")
+#  end
+end
+
 
 define audit_log($summary, $details) do
   rs.audit_entries.create(
