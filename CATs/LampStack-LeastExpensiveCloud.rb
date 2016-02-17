@@ -937,6 +937,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
 #     public_cloud_vendor_name: $cloud_provider_filter,  
      cloud_href: $cloud_href_filter,
      cpu_count: $cpu_count_array,
+     account_href: [null],  # this returns the standard on-demand pricing
      resource_type: ["instance"],
      purchase_option_type: ["on_demand_instance"],
      platform: ["Linux/UNIX"],
