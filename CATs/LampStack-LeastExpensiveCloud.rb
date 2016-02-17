@@ -994,11 +994,8 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
            # There may be more than one usage_charge elements in the returned array. So find one that is NOT an option since this is the base price we'll be using
            $price = ""
            foreach $usage_charge in $price_hash["usage_charges"] do
-             if $usage_charge["option"] == false
-                $price = $usage_charge["price"]
-  
-  #              call audit_log(join(["Found price for ", $found_cloud_vendor, "; price: ", $price]), to_s($price_hash))
-             end
+              $price = $usage_charge["price"]
+#              call audit_log(join(["Found price for ", $found_cloud_vendor, "; price: ", $price]), to_s($price_hash))
            end
            
            # Is it cheapest so far?

@@ -176,7 +176,7 @@ mapping "map_mci" do {
 
 ### Server Definition ###
 resource "linux_server", type: "server" do
-  name 'Linux Server'
+  name join(['Linux Server-',last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
   instance_type map($map_instancetype, $param_instancetype, $param_location)
@@ -196,7 +196,7 @@ end
 resource "sec_group", type: "security_group" do
   condition $needsSecurityGroup
 
-  name join(["LinuxServerSecGrp-",@@deployment.href])
+  name join(["LinuxServerSecGrp-",last(split(@@deployment.href,"/"))])
   description "Linux Server security group."
   cloud map( $map_cloud, $param_location, "cloud" )
 end
@@ -204,7 +204,7 @@ end
 resource "sec_group_rule_ssh", type: "security_group_rule" do
   condition $needsSecurityGroup
 
-  name "Linux server SSH Rule"
+  name join(["Linux server SSH Rule-",last(split(@@deployment.href,"/"))])
   description "Allow SSH access."
   source_type "cidr_ips"
   security_group @sec_group
