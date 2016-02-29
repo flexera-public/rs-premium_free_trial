@@ -49,7 +49,7 @@ parameter "param_location" do
   label "Cloud" 
   type "string" 
   allowed_values "AWS", "Azure", "Google", "VMware" 
-  default "AWS"
+  default "Google"
 end
 
 

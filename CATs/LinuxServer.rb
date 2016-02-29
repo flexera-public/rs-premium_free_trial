@@ -39,7 +39,7 @@ parameter "param_location" do
   type "string" 
   description "Cloud to deploy in." 
   allowed_values "AWS", "Azure", "Google", "VMware"
-  default "AWS"
+  default "Google"
 end
 
 parameter "param_servertype" do
