@@ -193,11 +193,11 @@ end
 mapping "map_st" do {
   "server" => {
     "name" => "Rancher Server",
-    "rev" => "17",
+    "rev" => "21", # previous: 17
   },
   "host" => {
     "name" => "Rancher Host",
-    "rev" => "7", 
+    "rev" => "10", # previous: 7
   },
 } end
 
@@ -208,7 +208,7 @@ mapping "map_mci" do {
   },
   "Public" => { # all other clouds
     "mci_name" => "Ubuntu_14.04_x64",
-    "mci_rev" => "13",
+    "mci_rev" => "20", # previous: 13
   }
 } end
 
@@ -258,7 +258,8 @@ resource 'rancher_server', type: 'server' do
     # Set the Route53 inputs to not use it.
     "ROUTE_53_UPDATE_RECORD" => "text:false",
     "ROUTE_53_AWS_ACCESS_KEY_ID" => "text:unused",
-    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused"
+    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused",
+    "NEW_RELIC_LICENSE_KEY" => "text:unused"  # No New Relic configured but key placeholder needed
   } end
 end
 
@@ -276,7 +277,8 @@ resource 'rancher_host', type: 'server_array' do
     # Set the Route53 inputs to not use it.
     "ROUTE_53_UPDATE_RECORD" => "text:false",
     "ROUTE_53_AWS_ACCESS_KEY_ID" => "text:unused",
-    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused"
+    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused",
+    "NEW_RELIC_LICENSE_KEY" => "text:unused"  # No New Relic configured but key placeholder needed
   } end  
   # Server Array Settings
   state "enabled"
@@ -525,6 +527,8 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   
   # Get the keys from the API
   call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug: apikeys response body", detail: inspect($body))
+
   $publicValue = $body["publicValue"] # Public API key
   $secretValue = $body["secretValue"] # Secret API key
     
