@@ -63,6 +63,14 @@ parameter "param_num_nodes" do
   constraint_description "Must be a value between 1-4"
 end
 
+parameter "param_costcenter" do 
+  category "User Inputs"
+  label "Cost Center" 
+  type "string" 
+  allowed_values "Development", "QA", "Production"
+  default "Development"
+end
+
 ################################
 # Outputs returned to the user #
 ################################
@@ -299,7 +307,7 @@ end
 # DEFINITIONS (i.e. RCL) #
 ##########################
 # Import and set up what is needed for the server and then launch it.
-define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_swarmnode, $map_cloud, $map_st, $param_location, $needsSshKey, $needsSecurityGroup) return @swarm_manager, @swarm_node, @sec_group, @ssh_key, $swarm_node_ids do
+define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_swarmnode, $map_cloud, $map_st, $param_location, $param_costcenter, $needsSshKey, $needsSecurityGroup) return @swarm_manager, @swarm_node, @sec_group, @ssh_key, $swarm_node_ids do
 
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -348,10 +356,14 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
   
   # Now we re-run the manager script so the swarm manager will discover the swarm nodes.
   call run_script("APP docker swarm manage", @swarm_manager)
+  
+  # Now tag the servers with the selected project cost center ID.
+  $tags=[join(["costcenter:id=",$param_costcenter])]
+  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  rs.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
 
   # Get the array of node instances IDs from the server array.
   @instances= rs.get(href: @@deployment.href).server_arrays().current_instances()
-  
   
   # Get a list of node IDs as they appear when listing nodes or containers in docker.
   # In AWS this is basically the host name which is the first part of the private DNS name.

@@ -59,6 +59,14 @@ parameter "param_ram" do
   default "2"
 end
 
+parameter "param_costcenter" do 
+  category "User Inputs"
+  label "Cost Center" 
+  type "string" 
+  allowed_values "Development", "QA", "Production"
+  default "Development"
+end
+
 parameter "param_appcode" do 
   category "Application Code"
   label "Repository and Branch" 
@@ -530,7 +538,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
+define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram, $param_costcenter)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
 
   # Find and import the server template - just in case it hasn't been imported to the account already
   call importServerTemplate($map_st)
@@ -736,6 +744,11 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   $lb_status_link = join(["http://", $server_addr, "/haproxy-status"])
     
   call calc_app_cost(@app_server) retrieve $app_cost
+  
+  # Now tag the servers with the selected project cost center ID.
+  $tags=[join(["costcenter:id=",$param_costcenter])]
+  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  rs.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
 
 end 
 
@@ -784,7 +797,28 @@ define scale_out_array(@app_server, @lb_server) return $app_cost do
     
   call calc_app_cost(@app_server) retrieve $app_cost
 
+  call apply_costcenter_tag(@app_server)
 
+end
+
+# Apply the cost center tag to the server array instance(s)
+define apply_costcenter_tag(@server_array) do
+  # Get the tags for the first instance in the array
+  $tags = rs.tags.by_resource(resource_hrefs: [@server_array.current_instances().href[][0]])
+  # Pull out only the tags bit from the response
+  $tags_array = $tags[0][0]['tags']
+
+  # Loop through the tags from the existing instance and look for the costcenter tag
+  $costcenter_tag = ""
+  foreach $tag_item in $tags_array do
+    $tag = $tag_item['name']
+    if $tag =~ /costcenter:id/
+      $costcenter_tag = $tag
+    end
+  end  
+
+  # Now apply the costcenter tag to all the servers in the array - including the one that was just added as part of the scaling operation
+  rs.tags.multi_add(resource_hrefs: @server_array.current_instances().href[], tags: [$costcenter_tag])
 end
 
 # Scale in (remove) server

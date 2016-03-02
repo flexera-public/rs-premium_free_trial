@@ -62,6 +62,14 @@ parameter "param_instancetype" do
   default "standard performance"
 end
 
+parameter "param_costcenter" do 
+  category "User Inputs"
+  label "Cost Center" 
+  type "string" 
+  allowed_values "Development", "QA", "Production"
+  default "Development"
+end
+
 ################################
 # Outputs returned to the user #
 ################################
@@ -306,7 +314,11 @@ define pre_auto_launch($map_cloud, $param_location, $invSphere, $map_st) do
 
 end
 
-define enable(@linux_server, $inAzure, $invSphere) return $server_ip_address do
+define enable(@linux_server, $param_costcenter, $inAzure, $invSphere) return $server_ip_address do
+  
+    # Tag the servers with the selected project cost center ID.
+    $tags=[join(["costcenter:id=",$param_costcenter])]
+    rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
     # Get the appropriate IP address depending on the environment.
     if $invSphere

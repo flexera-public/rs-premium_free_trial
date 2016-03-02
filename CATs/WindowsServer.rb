@@ -86,6 +86,14 @@ parameter "param_password" do
   no_echo "true"
 end
 
+parameter "param_costcenter" do 
+  category "User Inputs"
+  label "Cost Center" 
+  type "string" 
+  allowed_values "Development", "QA", "Production"
+  default "Development"
+end
+
 
 ################################
 # Outputs returned to the user #
@@ -345,7 +353,12 @@ define pre_auto_launch($map_cloud, $param_location, $param_password, $map_st) do
 
 end
 
-define enable(@windows_server, $inAzure) return $server_ip_address do
+define enable(@windows_server, $param_costcenter, $inAzure) return $server_ip_address do
+  
+  # Tag the servers with the selected project cost center ID.
+  $tags=[join(["costcenter:id=",$param_costcenter])]
+  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+    
   # If deployed in Azure one needs to provide the port mapping that Azure uses.
   if $inAzure
      @bindings = rs.clouds.get(href: @windows_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @windows_server.current_instance().href])

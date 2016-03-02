@@ -58,6 +58,14 @@ parameter 'param_qty' do
   default 1
 end
 
+parameter "param_costcenter" do 
+  category "Deployment Options"
+  label "Cost Center" 
+  type "string" 
+  allowed_values "Development", "QA", "Production"
+  default "Development"
+end
+
 ################################
 # Outputs returned to the user #
 ################################
@@ -384,7 +392,7 @@ end
 
 # Import and set up what is needed for the server and then launch it.
 # This does NOT install WordPress.
-define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sgrule_datanode_address, @sgrule_datanode_http, @sgrule_datanode_ipc, @sgrule_namenode_address, @sgrule_namenode_http, @ssh_key, @placement_group, $hadoop_config, $map_cloud, $map_st, $param_location, $needsSshKey, $needsSecurityGroup, $needsPlacementGroup, $inAzure) return @namenode, @datanode_cluster, @sec_group, @ssh_key, $namenode_portal, $data_portal do
+define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sgrule_datanode_address, @sgrule_datanode_http, @sgrule_datanode_ipc, @sgrule_namenode_address, @sgrule_namenode_http, @ssh_key, @placement_group, $hadoop_config, $map_cloud, $map_st, $param_location, $param_costcenter, $needsSshKey, $needsSecurityGroup, $needsPlacementGroup, $inAzure) return @namenode, @datanode_cluster, @sec_group, @ssh_key, $namenode_portal, $data_portal do
   
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -461,6 +469,11 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
   # Now we re-run the attach script so the namenode will find the datanode.
   # This is done in case the datanode actually came up before the namenode due to the concurrency used above.
   call run_recipe_inputs(@namenode, "hadoop::handle_attach", {})  
+    
+  # Now tag the servers with the selected project cost center ID.
+  $tags=[join(["costcenter:id=",$param_costcenter])]
+  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  rs.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
 
   # If deployed in Azure one needs to set up the port mapping that Azure uses.
   if $inAzure
