@@ -52,6 +52,14 @@ parameter "param_location" do
   default "AWS"
 end
 
+parameter "param_costcenter" do 
+  category "Deployment Options"
+  label "Cost Center" 
+  type "string" 
+  allowed_values "Development", "QA", "Production"
+  default "Development"
+end
+
 
 ################################
 # Outputs returned to the user #
@@ -272,7 +280,11 @@ define pre_auto_launch($map_cloud, $param_location, $map_st) do
 
 end
     
-define enable(@docker_server, $invSphere, $inAzure) return $wordpress_link do  
+define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $wordpress_link do  
+    
+  # Tag the servers with the selected project cost center ID.
+  $tags=[join(["costcenter:id=",$param_costcenter])]
+  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
   # Get the appropriate IP address depending on the environment.
   if $invSphere

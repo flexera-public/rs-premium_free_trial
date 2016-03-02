@@ -52,10 +52,10 @@ end
 
 parameter "param_costcenter" do 
   category "Deployment Options"
-  label "Cost Center ID" 
+  label "Cost Center" 
   type "string" 
-  allowed_values "CC1", "CC2", "CC3" 
-  default "CC1"
+  allowed_values "Development", "QA", "Production"
+  default "Development"
 end
 
 ################################
@@ -581,7 +581,7 @@ define install_appcode($param_appcode, @app_server) do
 end
 
 # Scale out (add) server
-define scale_out_array(@app_server, @lb_server, $param_costcenter) do
+define scale_out_array(@app_server, @lb_server) do
   task_label("Scale out application server.")
   @task = @app_server.launch(inputs: {})
 
@@ -600,10 +600,28 @@ define scale_out_array(@app_server, @lb_server, $param_costcenter) do
   # Tell the load balancer to find the new app server
   call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
     
-  # Apply the cost center tag to the server array instance(s)
-  $tags=[join(["costcenter:id=",$param_costcenter])]
-  rs.tags.multi_add(resource_hrefs: @app_server.current_instances().href[], tags: $tags)
+  call apply_costcenter_tag(@app_server)
 
+end
+
+# Apply the cost center tag to the server array instance(s)
+define apply_costcenter_tag(@server_array) do
+  # Get the tags for the first instance in the array
+  $tags = rs.tags.by_resource(resource_hrefs: [@server_array.current_instances().href[][0]])
+  # Pull out only the tags bit from the response
+  $tags_array = $tags[0][0]['tags']
+
+  # Loop through the tags from the existing instance and look for the costcenter tag
+  $costcenter_tag = ""
+  foreach $tag_item in $tags_array do
+    $tag = $tag_item['name']
+    if $tag =~ /costcenter:id/
+      $costcenter_tag = $tag
+    end
+  end  
+
+  # Now apply the costcenter tag to all the servers in the array - including the one that was just added as part of the scaling operation
+  rs.tags.multi_add(resource_hrefs: @server_array.current_instances().href[], tags: [$costcenter_tag])
 end
 
 # Scale in (remove) server
