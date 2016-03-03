@@ -548,12 +548,12 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
     'RANCHER_URL':join(["text:", $rancher_ui_uri])
   } 
   @@deployment.multi_update_inputs(inputs: $inp) 
-  
+    
   # Launch the rancher host array
   provision(@rancher_host)
   
   # Now enable local authentication with username and password = rightscale
-  call enable_rancher_auth(@rancher_server, "rightscale", "rightscale")
+  #DEBUG don't do this for now: call enable_rancher_auth(@rancher_server, "rightscale", "rightscale")
    
 
 end 
@@ -637,7 +637,10 @@ nginx:
 
   # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
   call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
-
+  
+#DEBUG create local user at the very end
+  call enable_rancher_auth(@rancher_server, "rightscale", "rightscale")
+raise "FIX THE LOCAL USER CREATIONG DEBUG STUFF"
 end
 
 # Runs the provided docker and rancher compose files on the cluster
