@@ -525,8 +525,15 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080/"])
   $rancher_infra_uri = join([$rancher_ui_uri, "infra/hosts"])
   
+  # Test the API to make sure the server is ready
+  call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response type", detail: type($body))
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response contents", detail: inspect($body))
+
+
   # Get the keys from the API
   call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug: apikeys response type", detail: type($body))
   rs.audit_entries.create(auditee_href: @@deployment, summary: "debug: apikeys response body", detail: inspect($body))
 
   $publicValue = $body["publicValue"] # Public API key
@@ -553,7 +560,11 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   provision(@rancher_host)
   
   # Now enable local authentication with username and password = rightscale
-  #DEBUG don't do this for now: call enable_rancher_auth(@rancher_server, "rightscale", "rightscale")
+  # NOT DOING THIS AT THIS TIME. 
+  # Creating the local user forces the user to pick an environment the first time they login to the Rancher UI which may confuse folks.
+  # The other edge of this sword though is that no creating a local user causes a little red ! to be shown on the UI since there is no access control.
+  # But from a easy-to-use perspective, that's the best option.
+  #call enable_rancher_auth(@rancher_server, "rightscale", "rightscale")
    
 
 end 
@@ -638,9 +649,6 @@ nginx:
   # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
   call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
   
-#DEBUG create local user at the very end
-  call enable_rancher_auth(@rancher_server, "rightscale", "rightscale")
-raise "FIX THE LOCAL USER CREATIONG DEBUG STUFF"
 end
 
 # Runs the provided docker and rancher compose files on the cluster
