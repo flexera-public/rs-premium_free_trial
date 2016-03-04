@@ -32,7 +32,7 @@ short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_log
 
 Launches a Rancher cluster of Docker hosts."
 long_description "Launches a Rancher cluster.\n
-Clouds Supported: <B>AWS, Google</B>"
+Clouds Supported: <B>AWS</B>"
 
 ##################
 # User inputs    #
@@ -41,8 +41,8 @@ parameter "param_location" do
   category "Cluster Options"
   label "Cloud" 
   type "string" 
-  allowed_values "AWS", "Google" 
-  default "Google"
+  allowed_values "AWS"  #, "Google" 
+  default "AWS"
 end
 
 parameter 'param_qty' do
