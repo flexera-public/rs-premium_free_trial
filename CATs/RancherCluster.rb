@@ -42,7 +42,7 @@ parameter "param_location" do
   label "Cloud" 
   type "string" 
   allowed_values "AWS", "Google" 
-  default "AWS"
+  default "Google"
 end
 
 parameter 'param_qty' do
