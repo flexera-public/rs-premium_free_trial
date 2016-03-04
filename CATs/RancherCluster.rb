@@ -104,28 +104,9 @@ end
 ################################
 # Outputs returned to the user #
 ################################
-output "rancher_ui_link" do
-  category "Rancher UI Access"
-  label "Rancher UI Link"
-  description "Click to access the Rancher UI.(NOTE: username/passsword = \"rightscale\")"
-end
-
-output "rancher_infra_link" do
-  category "Rancher UI Access"
-  label "Rancher Infrastructure Page"
-  description "Click to see the Rancher Cluster infrastructure."
-end
-
 [*1..10].each do |n|
   output "app_#{n}_name" do
     label "Application Name"
-    category "Application #{n}"
-  end
-end
-
-[*1..10].each do |n|
-  output "app_#{n}_link" do
-    label "Application Link"
     category "Application #{n}"
   end
 end
@@ -138,10 +119,29 @@ end
 end
 
 [*1..10].each do |n|
+  output "app_#{n}_link" do
+    label "Application Link"
+    category "Application #{n}"
+  end
+end
+
+[*1..10].each do |n|
   output "app_#{n}_code" do
     label "Application Rancher and Docker Compose Code"
     category "Application #{n}"
   end
+end
+
+output "rancher_ui_link" do
+  category "Rancher UI Access"
+  label "Rancher UI Link"
+  description "Click to access the Rancher UI.(NOTE: username/passsword = \"rightscale\")"
+end
+
+output "rancher_infra_link" do
+  category "Rancher UI Access"
+  label "Rancher Infrastructure Page"
+  description "Click to see the Rancher Cluster infrastructure."
 end
 
 ##############
@@ -289,7 +289,7 @@ resource 'rancher_host', type: 'server_array' do
       "max_count"            => 10
     },
     "pacing" => {
-      "resize_calm_time"     => 5, 
+      "resize_calm_time"     => 30, 
       "resize_down_by"       => 1,
       "resize_up_by"         => 1
     },
@@ -527,15 +527,17 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   
   # Test the API to make sure the server is ready
   call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
-  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response type", detail: type($body))
-  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response contents", detail: inspect($body))
-
+  while (type($body)  == 'string') do
+    rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response type", detail: to_s(type($body)))
+    rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response contents", detail: to_s(inspect($body)))
+    sleep(15)
+    call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
+  end
 
   # Get the keys from the API
   call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
-  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug: apikeys response type", detail: type($body))
-  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug: apikeys response body", detail: inspect($body))
-
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug: apikeys response type", detail: to_s(type($body)))
+  
   $publicValue = $body["publicValue"] # Public API key
   $secretValue = $body["secretValue"] # Secret API key
     
