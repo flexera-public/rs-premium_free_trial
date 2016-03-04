@@ -958,14 +958,10 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
   call audit_log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
 
    # Build an array of cpu counts for the pricing API filter
-   $cpu_count_array = []
    $numcpu = to_n($param_cpu)
-   $maxcpu = $numcpu *2
-   while $numcpu <= $maxcpu do
-     $cpu_count_array << $numcpu
-     $numcpu = $numcpu + 1
-   end
-   
+   $maxcpu = $numcpu + 1 # try one cpu bigger as well in the search.
+   $cpu_count_array = [$numcpu, $maxcpu]
+
    # pricing filters
    $filter = {
 #     public_cloud_vendor_name: $cloud_provider_filter,  
