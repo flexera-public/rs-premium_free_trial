@@ -193,11 +193,11 @@ end
 mapping "map_st" do {
   "server" => {
     "name" => "Rancher Server",
-    "rev" => "17",
+    "rev" => "21", # previous: 17
   },
   "host" => {
     "name" => "Rancher Host",
-    "rev" => "7", 
+    "rev" => "10", # previous: 7
   },
 } end
 
@@ -208,7 +208,7 @@ mapping "map_mci" do {
   },
   "Public" => { # all other clouds
     "mci_name" => "Ubuntu_14.04_x64",
-    "mci_rev" => "13",
+    "mci_rev" => "20", # previous: 13
   }
 } end
 
@@ -258,7 +258,8 @@ resource 'rancher_server', type: 'server' do
     # Set the Route53 inputs to not use it.
     "ROUTE_53_UPDATE_RECORD" => "text:false",
     "ROUTE_53_AWS_ACCESS_KEY_ID" => "text:unused",
-    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused"
+    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused",
+    "NEW_RELIC_LICENSE_KEY" => "text:unused"  # No New Relic configured but key placeholder needed
   } end
 end
 
@@ -276,7 +277,8 @@ resource 'rancher_host', type: 'server_array' do
     # Set the Route53 inputs to not use it.
     "ROUTE_53_UPDATE_RECORD" => "text:false",
     "ROUTE_53_AWS_ACCESS_KEY_ID" => "text:unused",
-    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused"
+    "ROUTE_53_AWS_SECRET_ACCESS_KEY" => "text:unused",
+    "NEW_RELIC_LICENSE_KEY" => "text:unused"  # No New Relic configured but key placeholder needed
   } end  
   # Server Array Settings
   state "enabled"
@@ -523,8 +525,17 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080/"])
   $rancher_infra_uri = join([$rancher_ui_uri, "infra/hosts"])
   
+  # Test the API to make sure the server is ready
+  call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response type", detail: type($body))
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response contents", detail: inspect($body))
+
+
   # Get the keys from the API
   call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug: apikeys response type", detail: type($body))
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug: apikeys response body", detail: inspect($body))
+
   $publicValue = $body["publicValue"] # Public API key
   $secretValue = $body["secretValue"] # Secret API key
     
@@ -544,12 +555,16 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
     'RANCHER_URL':join(["text:", $rancher_ui_uri])
   } 
   @@deployment.multi_update_inputs(inputs: $inp) 
-  
+    
   # Launch the rancher host array
   provision(@rancher_host)
   
   # Now enable local authentication with username and password = rightscale
-  call enable_rancher_auth(@rancher_server, "rightscale", "rightscale")
+  # NOT DOING THIS AT THIS TIME. 
+  # Creating the local user forces the user to pick an environment the first time they login to the Rancher UI which may confuse folks.
+  # The other edge of this sword though is that no creating a local user causes a little red ! to be shown on the UI since there is no access control.
+  # But from a easy-to-use perspective, that's the best option.
+  #call enable_rancher_auth(@rancher_server, "rightscale", "rightscale")
    
 
 end 
@@ -633,7 +648,7 @@ nginx:
 
   # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
   call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
-
+  
 end
 
 # Runs the provided docker and rancher compose files on the cluster
