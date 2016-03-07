@@ -92,7 +92,7 @@ mapping "map_cloud" do {
   "Azure" => {   
     "cloud" => "Azure East US",
     "zone" => null,
-    "instance_type" => "medium",
+    "instance_type" => "D1",
     "sg" => null, 
     "ssh_key" => null,
     "pg" => "@placement_group",

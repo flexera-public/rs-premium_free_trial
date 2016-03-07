@@ -120,7 +120,7 @@ mapping "map_cloud" do {
   "Azure" => {   
     "cloud" => "Azure East US",
     "zone" => null,
-    "instance_type" => "medium",
+    "instance_type" => "D1",
     "sg" => null, 
     "ssh_key" => null,
     "pg" => "@placement_group",
@@ -150,13 +150,13 @@ end
 mapping "map_instancetype" do {
   "Standard Performance" => {
     "AWS" => "m3.medium",
-    "Azure" => "medium",
+    "Azure" => "D1",
     "Google" => "n1-standard-1",
     "VMware" => "small",
   },
   "High Performance" => {
     "AWS" => "m3.large",
-    "Azure" => "large",
+    "Azure" => "D2",
     "Google" => "n1-standard-2",
     "VMware" => "large",
   }
