@@ -319,8 +319,8 @@ operation "enable" do
 end
 
 operation "terminate" do
-  description "Terminate the server and clean up"
-  definition "terminate_server"
+  description "clean up before auto terminate"
+  definition "pre_auto_terminate"
 end
 
 operation "Update Server Password" do
@@ -396,7 +396,7 @@ define update_password(@windows_server, $param_password) do
 end
 
 # Delete the credential created for the windows password
-define terminate_server(@windows_server) do
+define pre_auto_terminate() do
   
   # Delete the cred we created for the user-provided password
   $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
