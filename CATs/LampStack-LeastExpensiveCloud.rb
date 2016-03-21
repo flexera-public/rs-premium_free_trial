@@ -1086,7 +1086,10 @@ define calc_app_cost(@web_tier) return $app_cost do
     # see how many web server instances there are
     @web_servers = select(@web_tier.current_instances(), {"state":"/^(operational|stranded)/"})
     $num_web_servers = size(@web_servers)
-    $calculated_app_cost = ($num_web_servers + 2) * $instance_cost  # add two to the number of web servers to account for the load balancer and mysql servers
+    # Ruby floating point arithmetic can cause strange results. Google it.
+    # So to deal with it, we turn everything into an integer when doing the multiplications and then bring it back down to dollars and cents at the end.
+    # We multiply/divide by 1000 to account for some of the pricing out there that goes to half-cents.
+    $calculated_app_cost = (($num_web_servers + 2) * ($instance_cost * 1000))/1000  
     $app_cost = to_s($calculated_app_cost)
   end
   
