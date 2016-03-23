@@ -443,7 +443,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $map_db_creds, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, $site_link, $lb_status_link do 
+define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $map_db_creds, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do 
 
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -474,7 +474,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   
   # Provision the placement group if applicable
   if $needsPlacementGroup
-    provision(@placement_group)
+      provision(@placement_group)
   end
   
   # Launch the servers concurrently

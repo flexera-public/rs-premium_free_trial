@@ -538,7 +538,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram, $param_costcenter)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
+define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram, $param_costcenter)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
 
   # Find and import the server template - just in case it hasn't been imported to the account already
   call importServerTemplate($map_st)
@@ -648,7 +648,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
     $db_hash["fields"]["ssh_key_href"] = @ssh_key.href
   end
   
-  if map($map_cloud, $param_location, "pg")
+  if map($map_cloud, $param_location, "pg") 
     provision(@placement_group)
     $lb_hash["fields"]["placement_group_href"] = @placement_group.href
     $webtier_hash["fields"]["placement_group_href"] = @placement_group.href

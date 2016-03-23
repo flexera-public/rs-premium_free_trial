@@ -392,7 +392,7 @@ end
 
 # Import and set up what is needed for the server and then launch it.
 # This does NOT install WordPress.
-define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sgrule_datanode_address, @sgrule_datanode_http, @sgrule_datanode_ipc, @sgrule_namenode_address, @sgrule_namenode_http, @ssh_key, @placement_group, $hadoop_config, $map_cloud, $map_st, $param_location, $param_costcenter, $needsSshKey, $needsSecurityGroup, $needsPlacementGroup, $inAzure) return @namenode, @datanode_cluster, @sec_group, @ssh_key, $namenode_portal, $data_portal do
+define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sgrule_datanode_address, @sgrule_datanode_http, @sgrule_datanode_ipc, @sgrule_namenode_address, @sgrule_namenode_http, @ssh_key, @placement_group, $hadoop_config, $map_cloud, $map_st, $param_location, $param_costcenter, $needsSshKey, $needsSecurityGroup, $needsPlacementGroup, $inAzure) return @namenode, @datanode_cluster, @sec_group, @ssh_key, @placement_group, $namenode_portal, $data_portal do
   
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
