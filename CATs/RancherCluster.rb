@@ -28,7 +28,7 @@
 
 name 'Rancher Cluster'
 rs_ca_ver 20131202
-short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_logo.jpg) ![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
+short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_logo.png) ![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
 
 Launches a Rancher cluster of Docker hosts."
 long_description "Launches a Rancher cluster.\n

@@ -25,7 +25,7 @@
 
 name 'D) App Stack - Least Expensive Cloud'
 rs_ca_ver 20131202
-short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/best_price.png)
+short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/best_price_new.png)
 
 Launches a scalable LAMP stack that supports application code updates in least expensive PUBLIC or PRIVATE cloud based on user-specified CPU and RAM."
 long_description "Launches a 3-tier LAMP stack in the least expensive environment based on user-specified CPU and RAM requirements.\n
