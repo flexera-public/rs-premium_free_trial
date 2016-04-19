@@ -24,7 +24,7 @@
 
 name 'F) LAMP Stack'
 rs_ca_ver 20131202
-short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/lamp_cat.png)
+short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/lamp_icon.png)
 
 Launches a 3-tier LAMP stack."
 long_description "Launches a 3-tier LAMP stack.\n

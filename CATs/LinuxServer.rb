@@ -24,7 +24,7 @@
 # Required prolog
 name 'A) Corporate Standard Linux'
 rs_ca_ver 20131202
-short_description "![Linux](https://s3.amazonaws.com/rs-pft/cat-logos/linux.png)\n
+short_description "![Linux](https://s3.amazonaws.com/rs-pft/cat-logos/linux_logo.png)\n
 Get a Linux Server VM in any of our supported public or private clouds"
 long_description "Launches a Linux server, defaults to Ubuntu.\n
 \n
