@@ -27,7 +27,7 @@
 # Required prolog
 name 'Docker Swarm'
 rs_ca_ver 20131202
-short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png) 
+short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/dockerswarm.png) 
 
 Launches a Docker Swarm cluster."
 long_description "Launch a Docker Swarm cluster.\n
