@@ -71,6 +71,14 @@ parameter "param_costcenter" do
   default "Development"
 end
 
+parameter "num_add_nodes" do
+  category "Swarm Options"
+  type "number"
+  label "Number of Swarm Nodes to Add to the Cluster"
+  description "Enter the number of hosts you want to add to the swarm."
+  default 1
+end
+
 ################################
 # Outputs returned to the user #
 ################################
@@ -78,7 +86,7 @@ output "manager_ssh_link" do
   label "Swarm Manager SSH Link"
   category "Access"
   description "Use this string along with your SSH key to access your server."
-  default_value join(["rightscale@", @swarm_manager.public_ip_address])
+  default_value join(["ssh://rightscale@", @swarm_manager.public_ip_address])
 end
 
 output "ssh_key_info" do
@@ -226,7 +234,7 @@ resource "swarm_node", type: "server_array" do
   elasticity_params do {
     "bounds" => {
       "min_count"            => $param_num_nodes,
-      "max_count"            => $param_num_nodes
+      "max_count"            => 10
     },
     "pacing" => {
       "resize_calm_time"     => 5,
@@ -300,6 +308,19 @@ operation "launch" do
     hash
   end
  
+end
+
+operation "Add Nodes to Swarm" do
+  description "Adds (scales out) nodes to the Swarm."
+  definition "add_nodes"
+  hash = {}
+  [*0..10].each do |n|
+    hash[eval("$node_#{n}_id")] = switch(get(n,$swarm_node_ids),  get(0,get(n,$swarm_node_ids)), "")
+  end
+  
+  output_mappings do 
+    hash
+  end
 end
 
 
@@ -377,6 +398,32 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
 
 end 
 
+# Add nodes to the cluster
+define add_nodes(@swarm_node, $num_add_nodes) return $swarm_node_ids do
+  @task = @swarm_node.launch(count:$num_add_nodes)  
+  
+  sleep(90) # Give the servers a chance to get started before checking for states and problems
+  
+  $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
+  sleep_until all?(@swarm_node.current_instances().state[], $wake_condition)
+  
+  rs.audit_entries.create(auditee_href: @@deployment, summary: "instance states after waking", detail: to_s(@swarm_node.current_instances().state[]))
+
+  if !all?(@swarm_node.current_instances().state[], "operational")
+    raise "Some instances failed to start"    
+  end
+  
+  # Get a list of node IDs as they appear when listing nodes or containers in docker.
+  # In AWS this is basically the host name which is the first part of the private DNS name.
+  $swarm_node_ids = []  # This is an array of single-element arrays since that's what the output mapping code expects.
+  # Seed it with the manager ID since it's a node and a manager in one!
+  $swarm_node_ids << [ split(@swarm_manager.current_instance().private_dns_names[0], ".")[0] ]   
+  # Get the other node IDs in the list
+  foreach @instance in @swarm_node.current_instances() do
+    $swarm_node_ids << [ split(@instance.private_dns_names[0], ".")[0] ]
+  end
+end
+
 # Checks if the account supports the selected cloud
 define checkCloudSupport($cloud_name, $param_location) do
   # Gather up the list of clouds supported in this account.
@@ -410,7 +457,7 @@ end
 
 # Runs a rightscript on the given target node
 define run_script($script_name, @target) do
-  @script = rs.right_scripts.get(filter: join(["name==",$script_name]))
+  @script = rs.right_scripts.get(latest_only: true, filter: join(["name==",$script_name]))
   $right_script_href=@script.href
   @task = @target.current_instance().run_executable(right_script_href: $right_script_href, inputs: {})
   if @task.summary =~ "failed"
