@@ -399,7 +399,7 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
 end 
 
 # Add nodes to the cluster
-define add_nodes(@swarm_node, $num_add_nodes) return $swarm_node_ids do
+define add_nodes(@swarm_node, @swarm_manager, $num_add_nodes) return $swarm_node_ids do
   @task = @swarm_node.launch(count:$num_add_nodes)  
   
   sleep(90) # Give the servers a chance to get started before checking for states and problems
