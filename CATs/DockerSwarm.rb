@@ -41,6 +41,7 @@ Clouds Supported: <B>AWS, Google</B>"
 import "util/server_templates"
 import "util/err"
 import "util/cloud"
+import "common/mappings", as: 'common_mappings'
 
 ##################
 # Permissions    #
@@ -115,44 +116,8 @@ end
 ##############
 # MAPPINGS   #
 ##############
-mapping "map_cloud" do {
-  "AWS" => {
-    "cloud" => "EC2 us-east-1",
-    "zone" => null, # We don't care which az AWS decides to use.
-    "instance_type" => "m3.medium",
-    "sg" => '@sec_group',  
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "Azure" => {   
-    "cloud" => "Azure East US",
-    "zone" => null,
-    "instance_type" => "medium",
-    "sg" => null, 
-    "ssh_key" => null,
-    "pg" => "@placement_group",
-    "mci_mapping" => "Public",
-  },
-  "Google" => {
-    "cloud" => "Google",
-    "zone" => "us-central1-c", # launches in Google require a zone
-    "instance_type" => "n1-standard-2",
-    "sg" => '@sec_group',  
-    "ssh_key" => null,
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "VMware" => {
-    "cloud" => "VMware Private Cloud",
-    "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified  
-    "instance_type" => "large",
-    "sg" => null, 
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "VMware",
-  }
-}
+mapping "map_cloud" do
+  like $common_mappings.map_cloud
 end
 
 mapping "map_st" do {
