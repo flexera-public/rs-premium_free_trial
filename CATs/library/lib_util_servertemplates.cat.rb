@@ -1,8 +1,13 @@
 name "LIB - ServerTemplate Utilities"
 rs_ca_ver 20160108
-short_description "RCL definitions for working with ServerTemplates"
+short_description "RCL definitions and resources for working with ServerTemplates"
 
 package "util/server_templates"
+
+permission "import_servertemplates" do
+  actions   "rs_cm.import"
+  resources "rs_cm.publications"
+end
 
 # Imports the server templates found in the given map.
 # It assumes a "name" and "rev" mapping

@@ -42,23 +42,23 @@ import "util/server_templates"
 import "util/err"
 import "util/cloud"
 import "common/mappings", as: 'common_mappings'
+import "common/parameters"
+import "common/resources"
 
 ##################
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  actions   "rs_cm.import"
-  resources "rs_cm.publications"
+  like $server_templates.import_servertemplates
 end
 
 ##################
 # User inputs    #
 ##################
 parameter "param_location" do
+  like $parameters.param_location
+
   category "User Inputs"
-  label "Cloud"
-  type "string"
-  description "Cloud to deploy in."
   allowed_values "AWS" # Only AWS is currently supported at this time.
   default "AWS"
 end
@@ -73,11 +73,9 @@ parameter "param_num_nodes" do
 end
 
 parameter "param_costcenter" do 
+  like $parameters.param_costcenter
+
   category "User Inputs"
-  label "Cost Center" 
-  type "string" 
-  allowed_values "Development", "QA", "Production"
-  default "Development"
 end
 
 parameter "num_add_nodes" do
@@ -261,8 +259,7 @@ end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
-  name join(["sshkey_", last(split(@@deployment.href,"/"))])
-  cloud map($map_cloud, $param_location, "cloud")
+  like $resources.ssh_key
 end
 
 ####################
