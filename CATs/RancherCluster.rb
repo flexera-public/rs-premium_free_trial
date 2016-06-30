@@ -153,7 +153,7 @@ mapping "map_cloud" do {
   "AWS" => {
     "cloud" => "EC2 us-east-1",
     "zone" => null, # We don't care which az AWS decides to use.
-    "instance_type" => "m3.medium",
+    "instance_type" => "t2.micro",
     "sg" => '@sec_group',  
     "ssh_key" => "@ssh_key",
     "pg" => null,
@@ -207,8 +207,8 @@ mapping "map_mci" do {
     "mci_rev" => "NA",
   },
   "Public" => { # all other clouds
-    "mci_name" => "CentOS_7.1_x64",
-    "mci_rev" => "20", 
+    "mci_name" => "Ubuntu 16.04 (xenial) amd64 hvm-ssd",
+    "mci_rev" => "1", 
   }
 } end
 
