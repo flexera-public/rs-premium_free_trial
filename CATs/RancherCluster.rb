@@ -207,8 +207,8 @@ mapping "map_mci" do {
     "mci_rev" => "NA",
   },
   "Public" => { # all other clouds
-    "mci_name" => "Ubuntu_14.04_x64",
-    "mci_rev" => "36", 
+    "mci_name" => "CentOS_7.1_x64",
+    "mci_rev" => "20", 
   }
 } end
 
