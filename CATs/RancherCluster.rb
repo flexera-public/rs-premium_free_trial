@@ -193,11 +193,11 @@ end
 mapping "map_st" do {
   "server" => {
     "name" => "Rancher Server",
-    "rev" => "21", # previous: 17
+    "rev" => "22", # incorporates RL10.4 and related container management features in UI
   },
   "host" => {
     "name" => "Rancher Host",
-    "rev" => "10", # previous: 7
+    "rev" => "11", # # incorporates RL10.4 and related container management features in UI
   },
 } end
 
@@ -208,7 +208,7 @@ mapping "map_mci" do {
   },
   "Public" => { # all other clouds
     "mci_name" => "Ubuntu_14.04_x64",
-    "mci_rev" => "20", # previous: 13
+    "mci_rev" => "36", 
   }
 } end
 
