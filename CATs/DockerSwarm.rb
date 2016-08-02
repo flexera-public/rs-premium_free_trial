@@ -26,7 +26,7 @@
 
 # Required prolog
 name 'Docker Swarm'
-rs_ca_ver 20160108
+rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/dockerswarm.png) 
 
 Launches a Docker Swarm cluster."
@@ -44,6 +44,8 @@ import "util/cloud"
 import "common/mappings", as: 'common_mappings'
 import "common/parameters"
 import "common/resources"
+import "common/conditions"
+
 
 ##################
 # Permissions    #
@@ -144,25 +146,26 @@ mapping "map_mci" do {
 # CONDITIONS     #
 ##################
 
+# Used to decide whether or not to pass an SSH key or security group when creating the servers.
 condition "needsSshKey" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "VMware"))
+  like $conditions.needsSshKey
 end
 
 condition "needsSecurityGroup" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google"))
-end
-
-condition "invSphere" do
-  equals?($param_location, "VMware")
-end
-
-condition "inAzure" do
-  equals?($param_location, "Azure")
+  like $conditions.needsSecurityGroup
 end
 
 condition "needsPlacementGroup" do
-  equals?($param_location, "Azure")
-end 
+  like $conditions.needsPlacementGroup
+end
+
+condition "invSphere" do
+  like $conditions.invSphere
+end
+
+condition "inAzure" do
+  like $conditions.inAzure
+end
 
 ############################
 # RESOURCE DEFINITIONS     #

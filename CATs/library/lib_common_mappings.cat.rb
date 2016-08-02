@@ -1,5 +1,5 @@
 name "LIB - Common mappings"
-rs_ca_ver 20160108
+rs_ca_ver 20160622
 short_description "Mappings that are commonly used across CATs"
 
 package "common/mappings"

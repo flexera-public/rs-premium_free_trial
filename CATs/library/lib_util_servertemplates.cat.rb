@@ -1,5 +1,5 @@
 name "LIB - ServerTemplate Utilities"
-rs_ca_ver 20160108
+rs_ca_ver 20160622
 short_description "RCL definitions and resources for working with ServerTemplates"
 
 package "util/server_templates"
