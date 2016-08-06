@@ -38,7 +38,7 @@ parameter "param_location" do
   label "Cloud" 
   type "string" 
   description "Cloud to deploy in." 
-  allowed_values "AWS", "Azure", "Google", "VMware"
+  allowed_values "AWS", "Azure", "AzureRM", "Google", "VMware"
   default "Google"
 end
 
