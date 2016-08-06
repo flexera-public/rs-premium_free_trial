@@ -26,9 +26,9 @@ name 'A) Corporate Standard Linux'
 rs_ca_ver 20131202
 short_description "![Linux](https://s3.amazonaws.com/rs-pft/cat-logos/linux_logo.png)\n
 Get a Linux Server VM in any of our supported public or private clouds"
-long_description "Launches a Linux server, defaults to Ubuntu.\n
+long_description "Launches a Linux server.\n
 \n
-Clouds Supported: <B>AWS, Azure, Google, VMware</B>"
+Clouds Supported: <B>AWS, Azure, AzureRM, Google, VMware</B>"
 
 ##################
 # User inputs    #
@@ -42,15 +42,15 @@ parameter "param_location" do
   default "Google"
 end
 
-parameter "param_servertype" do
-  category "User Inputs"
-  label "Linux Server Type"
-  type "list"
-  description "Type of Linux server to launch"
-  allowed_values "CentOS", 
-    "Ubuntu"
-  default "Ubuntu"
-end
+#parameter "param_servertype" do
+#  category "User Inputs"
+#  label "Linux Server Type"
+#  type "list"
+#  description "Type of Linux server to launch"
+#  allowed_values "CentOS", 
+#    "Ubuntu"
+#  default "Ubuntu"
+#end
 
 parameter "param_instancetype" do
   category "User Inputs"
@@ -106,6 +106,7 @@ mapping "map_cloud" do {
     "sg" => '@sec_group',  
     "ssh_key" => "@ssh_key",
     "pg" => null,
+    "st_mapping" => "v14",
     "mci_mapping" => "Public",
   },
   "Azure" => {   
@@ -115,7 +116,18 @@ mapping "map_cloud" do {
     "sg" => null, 
     "ssh_key" => null,
     "pg" => "@placement_group",
+    "st_mapping" => "v14",
     "mci_mapping" => "Public",
+  },
+  "AzureRM" => {   
+    "cloud" => "AzureRM East US",
+    "zone" => null,
+    "instance_type" => "D1",
+    "sg" => null, 
+    "ssh_key" => null,
+    "pg" => null,
+    "st_mapping" => "rl10",
+    "mci_mapping" => "rl10",
   },
   "Google" => {
     "cloud" => "Google",
@@ -124,6 +136,7 @@ mapping "map_cloud" do {
     "sg" => '@sec_group',  
     "ssh_key" => null,
     "pg" => null,
+    "st_mapping" => "v14",
     "mci_mapping" => "Public",
   },
   "VMware" => {
@@ -133,6 +146,7 @@ mapping "map_cloud" do {
     "sg" => null, 
     "ssh_key" => "@ssh_key",
     "pg" => null,
+    "st_mapping" => "v14",
     "mci_mapping" => "VMware",
   }
 }
@@ -142,36 +156,42 @@ mapping "map_instancetype" do {
   "standard performance" => {
     "AWS" => "m3.medium",
     "Azure" => "D1",
+    "AzureRM" => "D1",
     "Google" => "n1-standard-1",
     "VMware" => "small",
   },
   "high performance" => {
     "AWS" => "m3.large",
     "Azure" => "D2",
+    "AzureRM" => "D2",
     "Google" => "n1-standard-2",
     "VMware" => "large",
   }
 } end
 
 mapping "map_st" do {
-  "linux_server" => {
+  "v14" => {
     "name" => "Base ServerTemplate for Linux (RSB) (v14.1.1)",
     "rev" => "18",
+  },
+  "rl10" => {
+    "name" => "RightLink 10.5.1 Linux Base",
+    "rev" => "69",
   },
 } end
 
 mapping "map_mci" do {
   "VMware" => { # vSphere 
-    "CentOS_mci" => "RightImage_CentOS_6.6_x64_v14.2_VMware",
-    "CentOS_mci_rev" => "9",
     "Ubuntu_mci" => "RightImage_Ubuntu_14.04_x64_v14.2_VMware",
     "Ubuntu_mci_rev" => "7"
   },
   "Public" => { # all other clouds
-    "CentOS_mci" => "RightImage_CentOS_6.6_x64_v14.2",
-    "CentOS_mci_rev" => "24",
     "Ubuntu_mci" => "RightImage_Ubuntu_14.04_x64_v14.2",
     "Ubuntu_mci_rev" => "11"
+  }, 
+  "rl10" => { # all other clouds
+    "Ubuntu_mci" => "Ubuntu_14.04_x64",
+    "Ubuntu_mci_rev" => "49"
   }
 } end
 
@@ -181,9 +201,23 @@ mapping "map_mci" do {
 ############################
 # RESOURCE DEFINITIONS     #
 ############################
+### Network Definitions ###
+# Only needed for ARM where since PFT CATs need to be self-sufficient and portable we can't assume it already has a default network defined.
+resource "arm_network", type: "network" do
+  condition $inARM
+  name join(["cat_vpc_", last(split(@@deployment.href,"/"))])
+  cloud map($map_cloud, $param_location, "cloud")
+  cidr_block "192.168.164.0/24"
+end
 
 ### Server Definition ###
+# We have two server definitions. One is used if launching in anywhere other than ARM.
+# The other is for ARM launches. ARM gets special treatment since in the interest of being able to share these PFT CATs, 
+# we need to create the network. This then drives differences in the server definition. 
+# In a production scenario this PFT CAT "self-sufficiency" rule would likely not exist. 
 resource "linux_server", type: "server" do
+  condition $notInARM
+  
   name join(['Linux Server-',last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
@@ -191,11 +225,16 @@ resource "linux_server", type: "server" do
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
   security_group_hrefs map($map_cloud, $param_location, "sg")  
-  server_template_href find(map($map_st, "linux_server", "name"), revision: map($map_st, "linux_server", "rev"))
-  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), join([$param_servertype, "_mci"])), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), join([$param_servertype, "_mci_rev"])))
-  inputs do {
-    "SECURITY_UPDATES" => "text:enable" # Enable security updates
-  } end
+  server_template_href find(map($map_st, map($map_cloud, $param_location, "st_mapping"), "name"), revision: map($map_st, map($map_cloud, $param_location, "st_mapping"), "rev"))
+  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "Ubuntu_mci"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "Ubuntu_mci_rev"))
+end
+
+resource "arm_linux_server", type: "server" do
+  condition $inARM
+  
+  like @linux_server
+  network @arm_network
+  subnets find("default", network_href: @arm_network)
 end
 
 ### Security Group Definitions ###
@@ -259,7 +298,7 @@ condition "needsSshKey" do
 end
 
 condition "needsSecurityGroup" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google"))
+  logic_or(logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google")), equals?($param_location, "AzureRM"))
 end
 
 condition "invSphere" do
@@ -268,6 +307,14 @@ end
 
 condition "inAzure" do
   equals?($param_location, "Azure")
+end
+
+condition "inARM" do
+  equals?($param_location, "AzureRM")
+end
+
+condition "notInARM" do
+  logic_not(equals?($param_location, "AzureRM"))
 end
 
 condition "needsPlacementGroup" do
@@ -293,6 +340,12 @@ operation "enable" do
   } end
 end
 
+operation "terminate" do
+  condition $inARM
+  description "Terminate the ARM server"
+  definition "arm_terminate"
+end
+
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
@@ -314,7 +367,7 @@ define pre_auto_launch($map_cloud, $param_location, $invSphere, $map_st) do
 
 end
 
-define enable(@linux_server, $param_costcenter, $inAzure, $invSphere) return $server_ip_address do
+define enable(@linux_server, @arm_linux_server, $param_costcenter, $inARM, $inAzure, $invSphere) return $server_ip_address do
   
     # Tag the servers with the selected project cost center ID.
     $tags=[join(["costcenter:id=",$param_costcenter])]
@@ -327,6 +380,12 @@ define enable(@linux_server, $param_costcenter, $inAzure, $invSphere) return $se
         sleep(10)
       end
       $server_addr =  @linux_server.current_instance().private_ip_addresses[0]
+    elsif $inARM
+      # Wait for the server to get the IP address we're looking for.
+      while equals?(@arm_linux_server.current_instance().public_ip_addresses[0], null) do
+        sleep(10)
+      end
+      $server_addr =  @arm_linux_server.current_instance().public_ip_addresses[0]
     else
       # Wait for the server to get the IP address we're looking for.
       while equals?(@linux_server.current_instance().public_ip_addresses[0], null) do
@@ -334,19 +393,21 @@ define enable(@linux_server, $param_costcenter, $inAzure, $invSphere) return $se
       end
       $server_addr =  @linux_server.current_instance().public_ip_addresses[0]
     end 
-
-    # If deployed in Azure one needs to provide the port mapping that Azure uses.
+    
+    $server_ip_address = "ssh://rightscale@" + $server_addr
+    
+    # If in Azure classic then there are some port bindings that need to be reflected in the SSH link
     if $inAzure
        @bindings = rs.clouds.get(href: @linux_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @linux_server.current_instance().href])
        @binding = select(@bindings, {"private_port":22})
-       $server_ip_address = join(["-p ", @binding.public_port, " rightscale@", to_s(@linux_server.current_instance().public_ip_addresses[0])])
-    else
-      # If not in Azure, then we can actually provide the SSH link like that found in CM.
-      call find_shard(@@deployment) retrieve $shard_number
-      call find_account_number() retrieve $account_number
-      call get_server_access_link(@linux_server, "SSH", $shard_number, $account_number) retrieve $server_ip_address
+       $server_ip_address = join(["-p ", @binding.public_port, " rightscale@", $server_addr])
     end
 end 
+
+# In ARM I want to delete the server before auto-terminate tries to delete the networks and stuff.
+define arm_terminate(@arm_linux_server) do
+  delete(@arm_linux_server) 
+end
 
 # Checks if the account supports the selected cloud
 define checkCloudSupport($cloud_name, $param_location) do
