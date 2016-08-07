@@ -86,13 +86,13 @@ output "vmware_note" do
   default_value "Your CloudApp was deployed in a VMware environment on a private network and so is not directly accessible. If you need access to the CloudApp, please contact your RightScale rep for network access."
 end
 
-output "ssh_key_info" do
-  condition $inAzure
-  label "Link to your SSH Key"
-  category "Output"
-  description "Use this link to download your SSH private key and use it to login to the server using provided \"SSH Link\"."
-  default_value "https://my.rightscale.com/global/users/ssh#ssh"
-end
+#output "ssh_key_info" do
+#  condition $inAzure
+#  label "Link to your SSH Key"
+#  category "Output"
+#  description "Use this link to download your SSH private key and use it to login to the server using provided \"SSH Link\"."
+#  default_value "https://my.rightscale.com/global/users/ssh#ssh"
+#end
 
 
 ##############
@@ -108,6 +108,8 @@ mapping "map_cloud" do {
     "pg" => null,
     "st_mapping" => "v14",
     "mci_mapping" => "Public",
+    "network" => null,
+    "subnets" => null
   },
   "Azure" => {   
     "cloud" => "Azure East US",
@@ -118,6 +120,8 @@ mapping "map_cloud" do {
     "pg" => "@placement_group",
     "st_mapping" => "v14",
     "mci_mapping" => "Public",
+    "network" => null,
+    "subnets" => null
   },
   "AzureRM" => {   
     "cloud" => "AzureRM East US",
@@ -128,6 +132,8 @@ mapping "map_cloud" do {
     "pg" => null,
     "st_mapping" => "rl10",
     "mci_mapping" => "rl10",
+    "network" => "@arm_network",
+    "subnets" => "default"
   },
   "Google" => {
     "cloud" => "Google",
@@ -138,6 +144,8 @@ mapping "map_cloud" do {
     "pg" => null,
     "st_mapping" => "v14",
     "mci_mapping" => "Public",
+    "network" => null,
+    "subnets" => null
   },
   "VMware" => {
     "cloud" => "VMware Private Cloud",
@@ -148,6 +156,8 @@ mapping "map_cloud" do {
     "pg" => null,
     "st_mapping" => "v14",
     "mci_mapping" => "VMware",
+    "network" => null,
+    "subnets" => null
   }
 }
 end
@@ -204,7 +214,7 @@ mapping "map_mci" do {
 ### Network Definitions ###
 # Only needed for ARM where since PFT CATs need to be self-sufficient and portable we can't assume it already has a default network defined.
 resource "arm_network", type: "network" do
-  condition $inARM
+  condition $inArm
   name join(["cat_vpc_", last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   cidr_block "192.168.164.0/24"
@@ -216,11 +226,12 @@ end
 # we need to create the network. This then drives differences in the server definition. 
 # In a production scenario this PFT CAT "self-sufficiency" rule would likely not exist. 
 resource "linux_server", type: "server" do
-  condition $notInARM
-  
+  condition $notInArm
   name join(['Linux Server-',last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
+  network map($map_cloud, $param_location, "network")
+  subnets map($map_cloud, $param_location, "subnets")
   instance_type map($map_instancetype, $param_instancetype, $param_location)
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
@@ -230,9 +241,9 @@ resource "linux_server", type: "server" do
 end
 
 resource "arm_linux_server", type: "server" do
-  condition $inARM
-  
+  condition $inArm
   like @linux_server
+  name join(['Linux Server-',last(split(@@deployment.href,"/"))])
   network @arm_network
   subnets find("default", network_href: @arm_network)
 end
@@ -309,11 +320,11 @@ condition "inAzure" do
   equals?($param_location, "Azure")
 end
 
-condition "inARM" do
+condition "inArm" do
   equals?($param_location, "AzureRM")
 end
 
-condition "notInARM" do
+condition "notInArm" do
   logic_not(equals?($param_location, "AzureRM"))
 end
 
@@ -327,7 +338,6 @@ end
 operation "launch" do 
   description "Launch the server"
   definition "pre_auto_launch"
-
 end
 
 operation "enable" do
@@ -340,9 +350,10 @@ operation "enable" do
   } end
 end
 
-operation "terminate" do
-  condition $inARM
-  description "Terminate the ARM server"
+# For ARM, we want to explicitly terminate the server before the networks are cleaned up
+operation "terminate" do 
+  condition $inArm
+  description "Terminate the server"
   definition "arm_terminate"
 end
 
@@ -352,7 +363,6 @@ end
 
 # Import and set up what is needed for the server and then launch it.
 define pre_auto_launch($map_cloud, $param_location, $invSphere, $map_st) do
-  
 
     # Need the cloud name later on
     $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -367,11 +377,30 @@ define pre_auto_launch($map_cloud, $param_location, $invSphere, $map_st) do
 
 end
 
-define enable(@linux_server, @arm_linux_server, $param_costcenter, $inARM, $inAzure, $invSphere) return $server_ip_address do
+define enable($param_costcenter, $invSphere, $inAzure, $inArm) return $server_ip_address do
   
+  call tag_it($param_costcenter)
+  
+  call get_server_ssh_link($invSphere, $inAzure, $inArm) retrieve $server_ip_address
+  
+end
+
+# In ARM I want to delete the server before auto-terminate tries to delete the networks and stuff.
+define arm_terminate(@arm_linux_server) do
+  delete(@arm_linux_server)
+end
+
+  
+define tag_it($param_costcenter) do
     # Tag the servers with the selected project cost center ID.
     $tags=[join(["costcenter:id=",$param_costcenter])]
     rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+end
+
+define get_server_ssh_link($invSphere, $inAzure, $inArm) return $server_ip_address do
+  
+  # Find the instance in the deployment
+  @linux_server = @@deployment.servers()
     
     # Get the appropriate IP address depending on the environment.
     if $invSphere
@@ -380,12 +409,6 @@ define enable(@linux_server, @arm_linux_server, $param_costcenter, $inARM, $inAz
         sleep(10)
       end
       $server_addr =  @linux_server.current_instance().private_ip_addresses[0]
-    elsif $inARM
-      # Wait for the server to get the IP address we're looking for.
-      while equals?(@arm_linux_server.current_instance().public_ip_addresses[0], null) do
-        sleep(10)
-      end
-      $server_addr =  @arm_linux_server.current_instance().public_ip_addresses[0]
     else
       # Wait for the server to get the IP address we're looking for.
       while equals?(@linux_server.current_instance().public_ip_addresses[0], null) do
@@ -394,20 +417,20 @@ define enable(@linux_server, @arm_linux_server, $param_costcenter, $inARM, $inAz
       $server_addr =  @linux_server.current_instance().public_ip_addresses[0]
     end 
     
-    $server_ip_address = "ssh://rightscale@" + $server_addr
+    $username = "rightscale"
+    if $inArm
+      call getUserLogin() retrieve $username
+    end
+
+    $server_ip_address = "ssh://"+ $username + "@" + $server_addr
     
     # If in Azure classic then there are some port bindings that need to be reflected in the SSH link
     if $inAzure
        @bindings = rs.clouds.get(href: @linux_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @linux_server.current_instance().href])
        @binding = select(@bindings, {"private_port":22})
-       $server_ip_address = join(["-p ", @binding.public_port, " rightscale@", $server_addr])
+       $server_ip_address = $server_ip_address + ":" + @binding.public_port
     end
 end 
-
-# In ARM I want to delete the server before auto-terminate tries to delete the networks and stuff.
-define arm_terminate(@arm_linux_server) do
-  delete(@arm_linux_server) 
-end
 
 # Checks if the account supports the selected cloud
 define checkCloudSupport($cloud_name, $param_location) do
@@ -442,100 +465,20 @@ define handle_retries($attempts) do
   end
 end
 
-# Helper Functions for creating the server access link provided back to the user
-# Returns either an RDP or SSH link for the given server.
-# This link can be provided as an output for a CAT and the user can select it to to get the
-# RDP or SSH file just like in Cloud Management.
-#
-# INPUTS:
-#   @server - server resource for which you want the link
-#   $link_type - "SSH" or "RDP" to indicate which type of access link you want back.
-#   $shard - the API shard to use. This can be found using the "find_shard.rb" definition.
-#   $account_number - the account number. This can be found using the "find_account_number.rb" definition.
-#
-define get_server_access_link(@server, $link_type, $shard, $account_number) return $server_access_link do
-  
-#  rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @@deployment, summary: join(["received account_number ", $account_number]), detail: ""})
+define getUserLogin() return $userlogin do
 
-  $rs_endpoint = "https://us-"+$shard+".rightscale.com"
-    
-  $instance_href = @server.current_instance().href
-  
-  $response = http_get(
-    url: $rs_endpoint+"/api/instances",
-    headers: { 
-    "X-Api-Version": "1.6",
-    "X-Account": $account_number
-    }
-   )
-  
-  $instances = $response["body"]
-  
-  $instance_of_interest = select($instances, { "href" : $instance_href })[0]
-#  rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @@deployment, summary: join(["instance of interest"]), detail: to_s($instance_of_interest)})
-    
-  $legacy_id = $instance_of_interest["legacy_id"]  
-
-  $cloud_id = $instance_of_interest["links"]["cloud"]["id"]
-  
-  $instance_public_ips = $instance_of_interest["public_ip_addresses"]
-  $instance_private_ips = $instance_of_interest["private_ip_addresses"]
-  $instance_ip = switch(empty?($instance_public_ips), to_s($instance_private_ips[0]), to_s($instance_public_ips[0]))
-#  rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @@deployment, summary: join(["instance_ip: ", $instance_ip]), detail: ""})
-
-  $server_access_link_root = "https://my.rightscale.com/acct/"+$account_number+"/clouds/"+$cloud_id+"/instances/"+$legacy_id
-  
-  if $link_type == "RDP"
-    $server_access_link = $server_access_link_root +"/rdp?host=" + $instance_ip
-  elsif $link_type == "SSH"
-    $server_access_link = $server_access_link_root +"/managed_ssh.jnlp?host=" + $instance_ip
-  else
-    raise "Incorrect link_type, " + $link_type + ", passed to get_server_access_link()."
-  end
-  
-#  rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @@deployment, summary: "access link", detail: $server_access_link})
-
-end
-
-# Returns the RightScale account number in which the CAT was launched.
-define find_account_number() return $rs_account_number do
-  $cloud_accounts = to_object(first(rs.cloud_accounts.get()))
-  @info = first(rs.cloud_accounts.get())
-  $info_links = @info.links
-  $rs_account_info = select($info_links, { "rel": "account" })[0]
-  $rs_account_href = $rs_account_info["href"]  
-    
-  $rs_account_number = last(split($rs_account_href, "/"))
-#  rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @@deployment, summary: "rs_account_number" , detail: to_s($rs_account_number)})
-end
-
-# Returns the RightScale shard for the account the given CAT is launched in.
-# It relies on the fact that when a CAT is launched, the resultant deployment description includes a link
-# back to Self-Service. 
-# This link is exploited to identify the shard.
-# Of course, this is somewhat dangerous because if the deployment description is changed to remove that link, 
-# this code will not work.
-# Similarly, since the deployment description is also based on the CAT description, if the CAT author or publisher
-# puts something like "selfservice-8" in it for some reason, this code will likely get confused.
-# However, for the time being it's fine.
-define find_shard(@deployment) return $shard_number do
-  
-  $deployment_description = @deployment.description
-  #rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: "deployment description" , detail: $deployment_description})
-  
-  # initialize a value
-  $shard_number = "UNKNOWN"
-  foreach $word in split($deployment_description, "/") do
-    if $word =~ "selfservice-" 
-    #rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: join(["found word:",$word]) , detail: ""}) 
-      foreach $character in split($word, "") do
-        if $character =~ /[0-9]/
-          $shard_number = $character
-          rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @@deployment, summary: join(["found shard:",$character]) , detail: ""}) 
-        end
-      end
+  $deployment_description_array = lines(@@deployment.description)
+  $userid="tbd"
+  foreach $entry in $deployment_description_array do
+    if include?($entry, "Author")
+      $userid = split(split(lstrip(split(split($entry, ":")[1], "(")[0]), '[`')[1],'`]')[0]
     end
   end
+
+  $userlogin = rs.users.get(filter: "email=="+$userid).login_name
+
 end
+
+
 
 
