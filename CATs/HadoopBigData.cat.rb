@@ -30,22 +30,26 @@ long_description "Launch a Hadoop cluster with a data node cluster of up to 4 se
 \n
 Clouds Supported: <B>AWS, Azure</B>"
 
+### IMPORTS ###
+import "common/parameters"
+import "common/mappings", as: 'common_mappings'
+import "common/conditions"
+import "common/resources"
+import "util/server_templates"
+import "util/err"
+import "util/cloud"
 
-parameter "param_location" do 
-  category "Deployment Options"
-  label "Cloud" 
-  type "string" 
+### USER INPUTS ###
+parameter "param_location" do
+  like $parameters.param_location
+
+  category "User Inputs"
   allowed_values "AWS", "Azure"
   default "AWS"
 end
 
 parameter "param_instancetype" do
-  category "Deployment Options"
-  label "Server Performance Level"
-  type "list"
-  allowed_values "Standard Performance",
-    "High Performance"
-  default "Standard Performance"
+  like $parameters.param_instancetype
 end
 
 parameter 'param_qty' do
@@ -58,13 +62,10 @@ parameter 'param_qty' do
   default 1
 end
 
-parameter "param_costcenter" do 
-  category "Deployment Options"
-  label "Cost Center" 
-  type "string" 
-  allowed_values "Development", "QA", "Production"
-  default "Development"
+parameter "param_costcenter" do
+  like $parameters.param_costcenter
 end
+
 
 ################################
 # Outputs returned to the user #
@@ -87,60 +88,13 @@ end
 ##############
 # MAPPINGS   #
 ##############
-mapping "map_cloud" do {
-  "AWS" => {
-    "cloud" => "EC2 us-east-1",
-    "zone" => null, # We don't care which az AWS decides to use.
-    "instance_type" => "m3.medium",
-    "sg" => '@sec_group',  
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "Azure" => {   
-    "cloud" => "Azure East US",
-    "zone" => null,
-    "instance_type" => "D1",
-    "sg" => null, 
-    "ssh_key" => null,
-    "pg" => "@placement_group",
-    "mci_mapping" => "Public",
-  },
-  "Google" => {
-    "cloud" => "Google",
-    "zone" => "us-central1-c", # launches in Google require a zone
-    "instance_type" => "n1-standard-2",
-    "sg" => '@sec_group',  
-    "ssh_key" => null,
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "VMware" => {
-    "cloud" => "VMware Private Cloud",
-    "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified  
-    "instance_type" => "large",
-    "sg" => null, 
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "VMware",
-  }
-}
+mapping "map_cloud" do
+  like $common_mappings.map_cloud
 end
 
-mapping "map_instancetype" do {
-  "Standard Performance" => {
-    "AWS" => "m3.medium",
-    "Azure" => "D1",
-    "Google" => "n1-standard-1",
-    "VMware" => "medium",
-  },
-  "High Performance" => {
-    "AWS" => "m3.large",
-    "Azure" => "D2",
-    "Google" => "n1-standard-2",
-    "VMware" => "large",
-  }
-} end
+mapping "map_instancetype" do
+  like $common_mappings.map_instancetype
+end
 
 mapping "map_st" do {
   "hadoop_server" => {
@@ -173,27 +127,25 @@ mapping "hadoop_config" do {
 ##################
 # CONDITIONS     #
 ##################
-
-# Used to decide whether or not to pass an SSH key or security group when creating the servers.
 condition "needsSshKey" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "VMware"))
+  like $conditions.needsSshKey
 end
 
 condition "needsSecurityGroup" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google"))
-end
-
-condition "invSphere" do
-  equals?($param_location, "VMware")
-end
-
-condition "inAzure" do
-  equals?($param_location, "Azure")
+  like $conditions.needsSecurityGroup
 end
 
 condition "needsPlacementGroup" do
-  equals?($param_location, "Azure")
-end 
+  like $conditions.needsPlacementGroup
+end
+
+condition "invSphere" do
+  like $conditions.invSphere
+end
+
+condition "inAzure" do
+  like $conditions.inAzure
+end
 
 
 ############################
@@ -354,28 +306,21 @@ end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
-#  condition $needsSshKey
-
-  name join(["sshkey_", last(split(@@deployment.href,"/"))])
-  cloud map($map_cloud, $param_location, "cloud")
+  like @resources.ssh_key
 end
 
 ### Placement Group ###
 resource "placement_group", type: "placement_group" do
-#  condition $needsPlacementGroup
+  like @resources.placement_group
+end
 
-  name last(split(@@deployment.href,"/"))
-  cloud map($map_cloud, $param_location, "cloud")
-end 
 
 ##################
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  actions   "rs.import"
-  resources "rs.publications"
+  like $server_templates.import_servertemplates
 end
-
 
 ####################
 # OPERATIONS       #
@@ -400,10 +345,10 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call checkCloudSupport($cloud_name, $param_location)
+  call cloud.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call importServerTemplate($map_st)
+  call server_template.importServerTemplate($map_st)
      
   # Create the Hadoop SSH bits if needed
   call manageHadoopSshKeys()
@@ -450,7 +395,7 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
     sub task_name:"Launch NameNode" do
       task_label("Launching NameNode")
       $namenode_retries = 0 
-      sub on_error: handle_retries($namenode_retries) do
+      sub on_error: err.handle_retries($namenode_retries) do
         $namenode_retries = $namenode_retries + 1
         provision(@namenode)
       end
@@ -459,7 +404,7 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
     sub task_name:"Launch DataNode Cluster" do
       task_label("Launching DataNode Cluster")
       $datanode_retries = 0 
-      sub on_error: handle_retries($datanode_retries) do
+      sub on_error: err.handle_retries($datanode_retries) do
         $datanode_retries = $datanode_retries + 1
         provision(@datanode_cluster)
       end
@@ -468,18 +413,18 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
   
   # Now we re-run the attach script so the namenode will find the datanode.
   # This is done in case the datanode actually came up before the namenode due to the concurrency used above.
-  call run_recipe_inputs(@namenode, "hadoop::handle_attach", {})  
+  call server_templates.run_recipe_inputs(@namenode, "hadoop::handle_attach", {})  
     
   # Now tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
-  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
-  rs.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
 
   # If deployed in Azure one needs to set up the port mapping that Azure uses.
   if $inAzure
     
     # Find the current bindings for the namenode instance and then drill down to find the IP address href
-    @bindings = rs.clouds.get(href: @namenode.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @namenode.current_instance().href])
+    @bindings = rs_cm.clouds.get(href: @namenode.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @namenode.current_instance().href])
     @binding = select(@bindings, {"private_port":22})
     @ipaddr = @binding.ip_address()
     
@@ -504,28 +449,6 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
  
 end 
 
-# Checks if the account supports the selected cloud
-define checkCloudSupport($cloud_name, $param_location) do
-  # Gather up the list of clouds supported in this account.
-  @clouds = rs.clouds.get()
-  $supportedClouds = @clouds.name[] # an array of the names of the supported clouds
-  
-  # Check if the selected/mapped cloud is in the list and yell if not
-  if logic_not(contains?($supportedClouds, [$cloud_name]))
-    raise "Your trial account does not support the "+$param_location+" cloud. Contact RightScale for more information on how to enable access to that cloud."
-  end
-end
-
-# Imports the server templates found in the given map.
-# It assumes a "name" and "rev" mapping
-define importServerTemplate($stmap) do
-  foreach $st in keys($stmap) do
-    $server_template_name = map($stmap, $st, "name")
-    $server_template_rev = map($stmap, $st, "rev")
-    @pub_st=rs.publications.index(filter: ["name=="+$server_template_name, "revision=="+$server_template_rev])
-    @pub_st.import()
-  end
-end
 
 # Creates if needed a couple of credentials used by the Hadoop nodes to communicate.
 define manageHadoopSshKeys() do
@@ -563,29 +486,12 @@ YavRrlAL/ZA0AwVCbgC1buHaJmP+fGmw+hNthmvVgSiMnG3nV+tIfg==
   }
   
  foreach $name in keys($key_hash) do
-   @cred = rs.credentials.get(filter: join(["name==",$name]))
+   @cred = rs_cm.credentials.get(filter: join(["name==",$name]))
    if empty?(@cred)  # need to create the cred to store the info
-     @task=rs.credentials.create({"name":$name, "value": $key_hash[$name]})
+     @task=rs_cm.credentials.create({"name":$name, "value": $key_hash[$name]})
    end
  end
 
 end
 
-# Helper functions
-define handle_retries($attempts) do
-  if $attempts < 3
-    $_error_behavior = "retry"
-    sleep(60)
-  else
-    $_error_behavior = "skip"
-  end
-end
-
-define run_recipe_inputs(@target, $recipe_name, $recipe_inputs) do
-  @task = @target.current_instance().run_executable(recipe_name: $recipe_name, inputs: $recipe_inputs)
-  sleep_until(@task.summary =~ "^(completed|failed)")
-  if @task.summary =~ "failed"
-    raise "Failed to run " + $recipe_name
-  end
-end
 

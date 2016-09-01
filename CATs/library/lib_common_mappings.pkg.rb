@@ -43,3 +43,18 @@ mapping "map_cloud" do {
   }
 }
 end
+
+mapping "map_instancetype" do {
+  "Standard Performance" => {
+    "AWS" => "m3.medium",
+    "Azure" => "D1",
+    "Google" => "n1-standard-1",
+    "VMware" => "medium",
+  },
+  "High Performance" => {
+    "AWS" => "m3.large",
+    "Azure" => "D2",
+    "Google" => "n1-standard-2",
+    "VMware" => "large",
+  }
+} end

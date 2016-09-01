@@ -45,7 +45,7 @@ import "common/parameters"
 import "common/outputs"
 import "common/conditions"
 import "common/mappings"
-import "common/resources", as: "common_resources"
+import "common/resources"
 import "util/server_templates"
 import "util/err"
 import "util/cloud"
@@ -159,12 +159,12 @@ end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
-  like $resources.ssh_key
+  like @resources.ssh_key
 end
 
 ### Placement Group ###
 resource "placement_group", type: "placement_group" do
-  like $resources.placement_group
+  like @resources.placement_group
 end 
 
 ##################

@@ -262,7 +262,7 @@ end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
-  like $resources.ssh_key
+  like @resources.ssh_key
 end
 
 ####################

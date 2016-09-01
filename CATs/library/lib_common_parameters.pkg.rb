@@ -12,6 +12,15 @@ parameter "param_location" do
   default "Google"
 end
 
+parameter "param_instancetype" do
+  category "Deployment Options"
+  label "Server Performance Level"
+  type "list"
+  allowed_values "Standard Performance",
+    "High Performance"
+  default "Standard Performance"
+end
+
 parameter "param_costcenter" do 
   category "Deployment Options"
   label "Cost Center" 
