@@ -9,15 +9,11 @@ import "common/mappings"
 import "common/conditions"
 
 resource "ssh_key", type: "ssh_key" do
-  condition $needsSshKey
-
   name join(["sshkey_", last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
 end
 
 resource "placement_group", type: "placement_group" do
-  condition $needsPlacementGroup
-
   name last(split(@@deployment.href,"/"))
   cloud map($map_cloud, $param_location, "cloud")
 end 

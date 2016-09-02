@@ -23,7 +23,7 @@
 
 # Required prolog
 name 'E) Hadoop Big Data'
-rs_ca_ver 20131202
+rs_ca_ver 20160622
 short_description "![Hadoop Cluster](https://s3.amazonaws.com/rs-pft/cat-logos/hadoop.png)\n
 Launch a Hadoop Cluster"
 long_description "Launch a Hadoop cluster with a data node cluster of up to 4 servers.\n
