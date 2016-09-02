@@ -22,12 +22,21 @@ end
 
 # Runs a rightscript without specified inputs on the given target node 
 define run_script($script_name, @target) do
-  @script = rs_cm.right_scripts.get(latest_only: true, filter: join(["name==",$script_name]))
+  @script = rs_cm.right_scripts.get(latest_only: true, filter: [ join(["name==",$script_name]) ])
   $right_script_href=@script.href
-  @task = @target.current_instance().run_executable(right_script_href: $right_script_href, inputs: {})
+  @task = @target.current_instance().run_executable(right_script_href: $right_script_href)
   if @task.summary =~ "failed"
     raise "Failed to run " + $script_name + " on server, " + @target.href
   end 
+end
+
+# Runs a recipe with no inputs on the given target node 
+define run_recipe_no_inputs(@target, $recipe_name) do
+  @task = @target.current_instance().run_executable(recipe_name: $recipe_name)
+  sleep_until(@task.summary =~ "^(completed|failed)")
+  if @task.summary =~ "failed"
+    raise "Failed to run " + $recipe_name
+  end
 end
 
 # Runs a recipe with specified inputs on the given target node 

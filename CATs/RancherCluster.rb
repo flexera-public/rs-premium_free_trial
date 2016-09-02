@@ -665,7 +665,7 @@ define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_comp
   
   # Find the script's href
   $script_name = "Run rancher-compose"
-  @script = rs.right_scripts.get(filter: join(["name==",$script_name]))
+  @script = rs.right_scripts.get(filter: [ join(["name==",$script_name]) ])
   $right_script_href=@script.href
   
   # Run the script on the Rancher Server

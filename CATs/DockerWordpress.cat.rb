@@ -159,11 +159,13 @@ end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
+  condition $needsSshKey
   like @resources.ssh_key
 end
 
 ### Placement Group ###
 resource "placement_group", type: "placement_group" do
+  condition $needsPlacementGroup
   like @resources.placement_group
 end 
 
@@ -277,12 +279,7 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $w
   
   # For some reason in Azure, the docker containers - esp wordpress - don't get started as expected.
   # Although this has only been seen in Azure we'll force a start in all clouds - just to be safe.
-  $script_name = "APP docker services up"
-  @script = rs_cm.right_scripts.get(filter: join(["name==",$script_name]))
-  $right_script_href=@script.href
-  @task = @docker_server.current_instance().run_executable(right_script_href: $right_script_href, inputs: {})
-  if @task.summary =~ "failed"
-    raise "Failed to run " + $right_script_href + " on server, " + @docker_server.href
-  end 
+  call server_templates.run_script("APP docker services up", @docker_server)
+
 end
 

@@ -348,7 +348,7 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
   call cloud.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call server_template.importServerTemplate($map_st)
+  call server_templates.importServerTemplate($map_st)
      
   # Create the Hadoop SSH bits if needed
   call manageHadoopSshKeys()
@@ -413,7 +413,7 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
   
   # Now we re-run the attach script so the namenode will find the datanode.
   # This is done in case the datanode actually came up before the namenode due to the concurrency used above.
-  call server_templates.run_recipe_inputs(@namenode, "hadoop::handle_attach", {})  
+  call server_templates.run_recipe_no_inputs(@namenode, "hadoop::handle_attach")  
     
   # Now tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
@@ -486,8 +486,8 @@ YavRrlAL/ZA0AwVCbgC1buHaJmP+fGmw+hNthmvVgSiMnG3nV+tIfg==
   }
   
  foreach $name in keys($key_hash) do
-   @cred = rs_cm.credentials.get(filter: join(["name==",$name]))
-   if empty?(@cred)  # need to create the cred to store the info
+   @cred = rs_cm.credentials.get(filter: [ join(["name==",$name]) ])
+   if equals?(size(@cred), 0) # need to create the cred to store the info
      @task=rs_cm.credentials.create({"name":$name, "value": $key_hash[$name]})
    end
  end

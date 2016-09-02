@@ -22,23 +22,31 @@
 # User can use a post-launch action to install a different version of the application software from a Git repo.
 
 
-name 'F) LAMP Stack'
-rs_ca_ver 20131202
+name 'LAMP Stack'
+rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/lamp_icon.png)
 
 Launches a 3-tier LAMP stack."
 long_description "Launches a 3-tier LAMP stack.\n
-Clouds Supported: <B>AWS, Azure, Google, VMware</B>"
+Clouds Supported: <B>AWS, Azure</B>"
+
+import "common/parameters"
+import "common/mappings"
+import "common/conditions"
+import "common/resources"
+import "util/server_templates"
+import "util/err"
+import "util/cloud"
+import "util/creds"
 
 ##################
 # User inputs    #
 ##################
-parameter "param_location" do 
-  category "Deployment Options"
-  label "Cloud" 
-  type "string" 
-  allowed_values "AWS", "Azure", "Google", "VMware" 
-  default "Google"
+parameter "param_location" do
+  like $parameters.param_location
+
+  allowed_values "AWS:$0.201/hour", "Azure:$0.219/hour"
+  default "AWS:$0.201/hour"
 end
 
 parameter "param_appcode" do 
@@ -47,15 +55,11 @@ parameter "param_appcode" do
   type "string" 
   allowed_values "(Yellow) github.com/rightscale/examples:unified_php", "(Blue) github.com/rs-services/rs-premium_free_trial:unified_php_modified" 
   default "(Blue) github.com/rs-services/rs-premium_free_trial:unified_php_modified"
-  operations "Update Application Code"
+  operations "update_app_code"
 end
 
 parameter "param_costcenter" do 
-  category "Deployment Options"
-  label "Cost Center" 
-  type "string" 
-  allowed_values "Development", "QA", "Production"
-  default "Development"
+  like $parameters.param_costcenter
 end
 
 ################################
@@ -71,13 +75,6 @@ output "lb_status" do
   label "Load Balancer Status Page" 
   category "Output"
   description "Accesses Load Balancer status page"
-end
-
-output "vmware_note" do
-  condition $invSphere
-  label "Deployment Note"
-  category "Output"
-  default_value "Your CloudApp was deployed in a VMware environment on a private network and so is not directly accessible. If you need access to the CloudApp, please contact your RightScale rep for network access."
 end
 
 output "app1_github_link" do
@@ -100,44 +97,8 @@ end
 ##############
 
 # Mapping and abstraction of cloud-related items.
-mapping "map_cloud" do {
-  "AWS" => {
-    "cloud" => "EC2 us-east-1",
-    "zone" => null, # We don't care which az AWS decides to use.
-    "instance_type" => "m3.medium",
-    "sg" => '@sec_group',  
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "Azure" => {   
-    "cloud" => "Azure East US",
-    "zone" => null,
-    "instance_type" => "D1",
-    "sg" => null, 
-    "ssh_key" => null,
-    "pg" => "@placement_group",
-    "mci_mapping" => "Public",
-  },
-  "Google" => {
-    "cloud" => "Google",
-    "zone" => "us-central1-c", # launches in Google require a zone
-    "instance_type" => "n1-standard-2",
-    "sg" => '@sec_group',  
-    "ssh_key" => null,
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "VMware" => {
-    "cloud" => "VMware Private Cloud",
-    "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified  
-    "instance_type" => "large",
-    "sg" => null, 
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "VMware",
-  }
-}
+mapping "map_cloud" do 
+  like $mappings.map_cloud
 end
 
 # Mapping of which ServerTemplates and Revisions to use for each tier.
@@ -188,24 +149,24 @@ mapping "map_db_creds" do {
 
 # Used to decide whether or not to pass an SSH key or security group when creating the servers.
 condition "needsSshKey" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "VMware"))
+  like $conditions.needsSshKey
 end
 
 condition "needsSecurityGroup" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google"))
+  like $conditions.needsSecurityGroup
 end
 
 condition "needsPlacementGroup" do
-  equals?($param_location, "Azure")
+  like $conditions.needsPlacementGroup
 end
 
 condition "invSphere" do
-  equals?($param_location, "VMware")
+  like $conditions.invSphere
 end
 
 condition "inAzure" do
-  equals?($param_location, "Azure")
-end
+  like $conditions.inAzure
+end  
 
 
 ############################
@@ -214,15 +175,15 @@ end
 
 ### Server Declarations ###
 resource 'lb_server', type: 'server' do
-  name 'Load Balancer'
-  cloud map( $map_cloud, $param_location, "cloud" )
-  datacenter map($map_cloud, $param_location, "zone")
-  instance_type map($map_cloud, $param_location, "instance_type")
-  ssh_key_href map($map_cloud, $param_location, "ssh_key")
-  placement_group_href map($map_cloud, $param_location, "pg")
-  security_group_hrefs map($map_cloud, $param_location, "sg") 
+  name join(['LB-',last(split(@@deployment.href,"/"))])
+  cloud map( $map_cloud, first(split($param_location,":")), "cloud" )
+  datacenter map($map_cloud, first(split($param_location,":")), "zone")
+  instance_type map($map_cloud, first(split($param_location,":")), "instance_type")
+  ssh_key_href map($map_cloud, first(split($param_location,":")), "ssh_key")
+  placement_group_href map($map_cloud, first(split($param_location,":")), "pg")
+  security_group_hrefs map($map_cloud, first(split($param_location,":")), "sg") 
   server_template find(map($map_st, "lb", "name"), revision: map($map_st, "lb", "rev"))
-  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
+  multi_cloud_image_href find(map($map_mci, map($map_cloud, first(split($param_location,":")), "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, first(split($param_location,":")), "mci_mapping"), "mci_rev"))
   inputs do {
     'ephemeral_lvm/logical_volume_name' => 'text:ephemeral0',
     'ephemeral_lvm/logical_volume_size' => 'text:100%VG',
@@ -246,7 +207,7 @@ end
 resource 'db_server', type: 'server' do
   like @lb_server
 
-  name 'Database Server'
+  name join(['DB-',last(split(@@deployment.href,"/"))])
   server_template find(map($map_st, "db", "name"), revision: map($map_st, "db", "rev"))
   inputs do {
     'ephemeral_lvm/logical_volume_name' => 'text:ephemeral0',
@@ -283,14 +244,14 @@ resource 'db_server', type: 'server' do
 end
 
 resource 'app_server', type: 'server_array' do
-  name 'App Server'
-  cloud map( $map_cloud, $param_location, "cloud" )
-  datacenter map($map_cloud, $param_location, "zone")
-  instance_type map($map_cloud, $param_location, "instance_type")
-  ssh_key_href map($map_cloud, $param_location, "ssh_key")
-  placement_group_href map($map_cloud, $param_location, "pg")
-  security_group_hrefs map($map_cloud, $param_location, "sg") 
-  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
+  name join(['App-',last(split(@@deployment.href,"/"))])
+  cloud map( $map_cloud, first(split($param_location,":")), "cloud" )
+  datacenter map($map_cloud, first(split($param_location,":")), "zone")
+  instance_type map($map_cloud, first(split($param_location,":")), "instance_type")
+  ssh_key_href map($map_cloud, first(split($param_location,":")), "ssh_key")
+  placement_group_href map($map_cloud, first(split($param_location,":")), "pg")
+  security_group_hrefs map($map_cloud, first(split($param_location,":")), "sg") 
+  multi_cloud_image_href find(map($map_mci, map($map_cloud, first(split($param_location,":")), "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, first(split($param_location,":")), "mci_mapping"), "mci_rev"))
   server_template find(map($map_st, "app", "name"), revision: map($map_st, "app", "rev"))
   inputs do {
     'ephemeral_lvm/logical_volume_name' => 'text:ephemeral0',
@@ -301,7 +262,7 @@ resource 'app_server', type: 'server_array' do
     'rs-application_php/app_root' => 'text:/',
     'rs-application_php/application_name' => 'text:default',
     'rs-application_php/bind_network_interface' => 'text:private',
-    'rs-application_php/database/host' => 'env:Database Server:PRIVATE_IP',
+    'rs-application_php/database/host' => "env:DB-"+last(split(@@deployment.href,"/"))+":PRIVATE_IP",
     'rs-application_php/database/password' => 'cred:CAT_MYSQL_APP_PASSWORD',
     'rs-application_php/database/schema' => 'text:app_test',
     'rs-application_php/database/user' => 'cred:CAT_MYSQL_APP_USERNAME',
@@ -334,16 +295,12 @@ end
 
 ## TO-DO: Set up separate security groups for each tier with rules that allow the applicable port(s) only from the IP of the given tier server(s)
 resource "sec_group", type: "security_group" do
-#  condition $needsSecurityGroup
-
   name join(["sec_group-",@@deployment.href])
   description "CAT security group."
-  cloud map( $map_cloud, $param_location, "cloud" )
+  cloud map( $map_cloud, first(split($param_location,":")), "cloud" )
 end
 
 resource "sec_group_rule_http", type: "security_group_rule" do
-#  condition $needsSecurityGroup
-  
   name "CAT HTTP Rule"
   description "Allow HTTP access."
   source_type "cidr_ips"
@@ -358,8 +315,6 @@ resource "sec_group_rule_http", type: "security_group_rule" do
 end
 
 resource "sec_group_rule_http8080", type: "security_group_rule" do
-#  condition $needsSecurityGroup
-  
   name "CAT HTTP Rule"
   description "Allow HTTP port 8080 access."
   source_type "cidr_ips"
@@ -374,8 +329,6 @@ resource "sec_group_rule_http8080", type: "security_group_rule" do
 end
 
 resource "sec_group_rule_mysql", type: "security_group_rule" do
-#  condition $needsSecurityGroup
-  
   name "CAT MySQL Rule"
   description "Allow MySQL access over standard port."
   source_type "cidr_ips"
@@ -391,26 +344,19 @@ end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
-#  condition $needsSshKey
-
-  name join(["sshkey_", last(split(@@deployment.href,"/"))])
-  cloud map($map_cloud, $param_location, "cloud")
+  like @resources.ssh_key
 end
 
 ### Placement Group ###
 resource "placement_group", type: "placement_group" do
-#  condition $needsPlacementGroup
-
-  name last(split(@@deployment.href,"/"))
-  cloud map($map_cloud, $param_location, "cloud")
+  like @resources.placement_group
 end 
 
 ##################
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  actions   "rs.import"
-  resources "rs.publications"
+  like $server_templates.import_servertemplates
 end
 
 ####################
@@ -425,17 +371,20 @@ operation "launch" do
   } end
 end
 
-operation "Update Application Code" do
+operation "update_app_code" do
+  label "Update Application Code"
   description "Select and install a different repo and branch of code."
   definition "install_appcode"
 end
 
-operation "Scale Out" do
+operation "scale_out" do
+  label "Scale Out"
   description "Adds (scales out) an application tier server."
   definition "scale_out_array"
 end
 
-operation "Scale In" do
+operation "scale_in" do
+  label "Scale In"
   description "Scales in an application tier server."
   definition "scale_in_array"
 end
@@ -446,17 +395,17 @@ end
 define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $map_db_creds, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do 
 
   # Need the cloud name later on
-  $cloud_name = map( $map_cloud, $param_location, "cloud" )
+  $cloud_name = map( $map_cloud, first(split($param_location,":")), "cloud" )
 
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call checkCloudSupport($cloud_name, $param_location)
+  call cloud.checkCloudSupport($cloud_name, first(split($param_location,":")))
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call importServerTemplate($map_st)
+  call server_templates.importServerTemplate($map_st)
   
-  call createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
+  call creds.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
     
   # Provision the resources
   
@@ -482,7 +431,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
     sub task_name:"Launch DB" do
       task_label("Launching DB")
       $db_retries = 0 
-      sub on_error: handle_retries($db_retries) do
+      sub on_error: functions.handle_retries($db_retries) do
         $db_retries = $db_retries + 1
         provision(@db_server)
       end
@@ -490,7 +439,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
     sub task_name:"Launch LB" do
       task_label("Launching LB")
       $lb_retries = 0 
-      sub on_error: handle_retries($lb_retries) do
+      sub on_error: functions.handle_retries($lb_retries) do
         $lb_retries = $lb_retries + 1
         provision(@lb_server)
       end
@@ -499,7 +448,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
     sub task_name:"Launch Application Tier" do
       task_label("Launching Application Tier")
       $apptier_retries = 0 
-      sub on_error: handle_retries($apptier_retries) do
+      sub on_error: functions.handle_retries($apptier_retries) do
         $apptier_retries = $apptier_retries + 1
         provision(@app_server)
       end
@@ -508,34 +457,34 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   
   concurrent do  
     # Enable monitoring for server-specific application software
-    call run_recipe_inputs(@lb_server, "rs-haproxy::collectd", {})
-    call run_recipe_inputs(@app_server, "rs-application_php::collectd", {})  
-    call run_recipe_inputs(@db_server, "rs-mysql::collectd", {})   
+    call server_templates.run_recipe_inputs(@lb_server, "rs-haproxy::collectd", {})
+    call server_templates.run_recipe_inputs(@app_server, "rs-application_php::collectd", {})  
+    call server_templates.run_recipe_inputs(@db_server, "rs-mysql::collectd", {})   
     
     # Import a test database
-    call run_recipe_inputs(@db_server, "rs-mysql::dump_import", {})  # applicable inputs were set at launch
+    call server_templates.run_recipe_inputs(@db_server, "rs-mysql::dump_import", {})  # applicable inputs were set at launch
     
     # Set up the tags for the load balancer and app servers to find each other.
-    call run_recipe_inputs(@lb_server, "rs-haproxy::tags", {})
-    call run_recipe_inputs(@app_server, "rs-application_php::tags", {})  
+    call server_templates.run_recipe_inputs(@lb_server, "rs-haproxy::tags", {})
+    call server_templates.run_recipe_inputs(@app_server, "rs-application_php::tags", {})  
     
     # Due to the concurrent launch above, it's possible the app server came up before the DB server and wasn't able to connect.
     # So, we re-run the application setup script to force it to connect.
-    call run_recipe_inputs(@app_server, "rs-application_php::default", {})
+    call server_templates.run_recipe_inputs(@app_server, "rs-application_php::default", {})
   end
     
   # Now that all the servers are good to go, tell the LB to find the app server.
   # This must run after the tagging is complete, so it is done outside the concurrent block above.
-  call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
+  call server_templates.run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
     
   # Now tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
-  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
-  rs.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
 
   # If deployed in Azure one needs to provide the port mapping that Azure uses.
   if $inAzure
-     @bindings = rs.clouds.get(href: @lb_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @lb_server.current_instance().href])
+     @bindings = rs_cm.clouds.get(href: @lb_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @lb_server.current_instance().href])
      @binding = select(@bindings, {"private_port":80})
      $server_addr = join([to_s(@lb_server.current_instance().public_ip_addresses[0]), ":", @binding.public_port])
   else
@@ -607,7 +556,7 @@ end
 # Apply the cost center tag to the server array instance(s)
 define apply_costcenter_tag(@server_array) do
   # Get the tags for the first instance in the array
-  $tags = rs.tags.by_resource(resource_hrefs: [@server_array.current_instances().href[][0]])
+  $tags = rs_cm.tags.by_resource(resource_hrefs: [@server_array.current_instances().href[][0]])
   # Pull out only the tags bit from the response
   $tags_array = $tags[0][0]['tags']
 
@@ -621,7 +570,7 @@ define apply_costcenter_tag(@server_array) do
   end  
 
   # Now apply the costcenter tag to all the servers in the array - including the one that was just added as part of the scaling operation
-  rs.tags.multi_add(resource_hrefs: @server_array.current_instances().href[], tags: [$costcenter_tag])
+  rs_cm.tags.multi_add(resource_hrefs: @server_array.current_instances().href[], tags: [$costcenter_tag])
 end
 
 # Scale in (remove) server
@@ -639,85 +588,7 @@ define scale_in_array(@app_server) do
     # Wait for the server to be no longer of this mortal coil
     sleep_until(@server_to_terminate.state != "operational" )
   else
-    rs.audit_entries.create(audit_entry: {auditee_href: @app_server.href, summary: "Scale In: No terminable server currently found in the server array"})
+    rs_cm.audit_entries.create(audit_entry: {auditee_href: @app_server.href, summary: "Scale In: No terminable server currently found in the server array"})
   end
 end
-
-####################
-# Helper Functions #
-####################
-# Checks if the account supports the selected cloud
-define checkCloudSupport($cloud_name, $param_location) do
-  # Gather up the list of clouds supported in this account.
-  @clouds = rs.clouds.get()
-  $supportedClouds = @clouds.name[] # an array of the names of the supported clouds
-  
-  # Check if the selected/mapped cloud is in the list and yell if not
-  if logic_not(contains?($supportedClouds, [$cloud_name]))
-    raise "Your trial account does not support the "+$param_location+" cloud. Contact RightScale for more information on how to enable access to that cloud."
-  end
-end
-  
-# Imports the server templates found in the given map.
-# It assumes a "name" and "rev" mapping
-define importServerTemplate($stmap) do
-  foreach $st in keys($stmap) do
-    $server_template_name = map($stmap, $st, "name")
-    $server_template_rev = map($stmap, $st, "rev")
-    @pub_st=rs.publications.index(filter: ["name=="+$server_template_name, "revision=="+$server_template_rev])
-    @pub_st.import()
-  end
-end
-
-# Creates CREDENTIAL objects in Cloud Management for each of the named items in the given array.
-define createCreds($credname_array) do
-  foreach $cred_name in $credname_array do
-    @cred = rs.credentials.get(filter: join(["name==",$cred_name]))
-    if empty?(@cred) 
-      $cred_value = join(split(uuid(), "-"))[0..14] # max of 16 characters for mysql username and we're adding a letter next.
-      $cred_value = "a" + $cred_value # add an alpha to the beginning of the value - just in case.
-      @task=rs.credentials.create({"name":$cred_name, "value": $cred_value})
-    end
-  end
-end
-
-# Helper functions
-define handle_retries($attempts) do
-  if $attempts < 3
-    $_error_behavior = "retry"
-    sleep(60)
-  else
-    $_error_behavior = "skip"
-  end
-end
-
-define run_recipe_inputs(@target, $recipe_name, $recipe_inputs) do
-  $target_type = type(@target)
-  if equals?($target_type, "rs.server_arrays") 
-    
-    @running_servers = select(@target.current_instances(), {"state":"operational"})
-    @tasks = @running_servers.run_executable(recipe_name: $recipe_name, inputs: $recipe_inputs)
-    sleep_until(all?(@tasks.summary[], "/^(completed|failed)/"))
-    if any?(@tasks.summary[], "/^failed/")
-      raise "Failed to run " + $right_script_href + " on one or more instances"
-    end
-    
-  else # server or instance
-    
-    if equals?($target_type, "rs.instances")
-      @exec_target=@target # target is already an instance type so we're good to go
-    else
-      @exec_target=@target.current_instance() # target is a server and so we need to link to the instance
-    end
-    
-    # Run the recipe against the instance
-    @task = @exec_target.run_executable(recipe_name: $recipe_name, inputs: $recipe_inputs)
-    sleep_until(@task.summary =~ "^(completed|failed)")
-    if @task.summary =~ "failed"
-      raise "Failed to run " + $recipe_name
-    end
-    
-  end
-end
-
 

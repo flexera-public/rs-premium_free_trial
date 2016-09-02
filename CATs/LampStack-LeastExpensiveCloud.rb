@@ -872,7 +872,7 @@ end
 # Creates CREDENTIAL objects in Cloud Management for each of the named items in the given array.
 define createCreds($credname_array) do
   foreach $cred_name in $credname_array do
-    @cred = rs.credentials.get(filter: join(["name==",$cred_name]))
+    @cred = rs.credentials.get(filter: [ join(["name==",$cred_name]) ])
     if empty?(@cred) 
       $cred_value = join(split(uuid(), "-"))[0..14] # max of 16 characters for mysql username and we're adding a letter next.
       $cred_value = "a" + $cred_value # add an alpha to the beginning of the value - just in case.
@@ -951,7 +951,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
 #      $cloud_provider_filter << $cloud_vendor_name
     
     # Build up a list of cloud hrefs for the pricing filter below
-    $cloud_href_array = rs.clouds.get(filter: join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")])).href[]
+    $cloud_href_array = rs.clouds.get(filter: [ join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")]) ]).href[]
     $cloud_href_filter = $cloud_href_filter + $cloud_href_array
   end
   

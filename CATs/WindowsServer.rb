@@ -380,13 +380,13 @@ define update_password(@windows_server, $param_password) do
     $cred_name = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
     # update the credential
     rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: join(["Updating credential, ", $cred_name])})
-    @cred = rs.credentials.get(filter: join(["name==",$cred_name]))
+    @cred = rs.credentials.get(filter: [ join(["name==",$cred_name]) ])
     @cred.update(credential: {"value" : $param_password})
   end
   
   # Now run the set admin script which will use the newly updated credential.
   $script_name = "SYS Set admin account (v13.5.0-LTS)"
-  @script = rs.right_scripts.get(filter: join(["name==",$script_name]))
+  @script = rs.right_scripts.get(filter: [ join(["name==",$script_name]) ])
   $right_script_href=@script.href
   @task = @windows_server.current_instance().run_executable(right_script_href: $right_script_href, inputs: {})
   sleep_until(@task.summary =~ "^(completed|failed)")
