@@ -45,8 +45,8 @@ import "util/creds"
 parameter "param_location" do
   like $parameters.param_location
 
-  allowed_values "AWS:$0.201/hour", "Azure:$0.219/hour"
-  default "AWS:$0.201/hour"
+  allowed_values "AWS", "Azure"
+  default "AWS"
 end
 
 parameter "param_appcode" do 
@@ -176,14 +176,14 @@ end
 ### Server Declarations ###
 resource 'lb_server', type: 'server' do
   name join(['LB-',last(split(@@deployment.href,"/"))])
-  cloud map( $map_cloud, first(split($param_location,":")), "cloud" )
-  datacenter map($map_cloud, first(split($param_location,":")), "zone")
-  instance_type map($map_cloud, first(split($param_location,":")), "instance_type")
-  ssh_key_href map($map_cloud, first(split($param_location,":")), "ssh_key")
-  placement_group_href map($map_cloud, first(split($param_location,":")), "pg")
-  security_group_hrefs map($map_cloud, first(split($param_location,":")), "sg") 
+  cloud map( $map_cloud, $param_location, "cloud" )
+  datacenter map($map_cloud, $param_location, "zone")
+  instance_type map($map_cloud, $param_location, "instance_type")
+  ssh_key_href map($map_cloud, $param_location, "ssh_key")
+  placement_group_href map($map_cloud, $param_location, "pg")
+  security_group_hrefs map($map_cloud, $param_location, "sg") 
   server_template find(map($map_st, "lb", "name"), revision: map($map_st, "lb", "rev"))
-  multi_cloud_image_href find(map($map_mci, map($map_cloud, first(split($param_location,":")), "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, first(split($param_location,":")), "mci_mapping"), "mci_rev"))
+  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
   inputs do {
     'ephemeral_lvm/logical_volume_name' => 'text:ephemeral0',
     'ephemeral_lvm/logical_volume_size' => 'text:100%VG',
@@ -245,13 +245,13 @@ end
 
 resource 'app_server', type: 'server_array' do
   name join(['App-',last(split(@@deployment.href,"/"))])
-  cloud map( $map_cloud, first(split($param_location,":")), "cloud" )
-  datacenter map($map_cloud, first(split($param_location,":")), "zone")
-  instance_type map($map_cloud, first(split($param_location,":")), "instance_type")
-  ssh_key_href map($map_cloud, first(split($param_location,":")), "ssh_key")
-  placement_group_href map($map_cloud, first(split($param_location,":")), "pg")
-  security_group_hrefs map($map_cloud, first(split($param_location,":")), "sg") 
-  multi_cloud_image_href find(map($map_mci, map($map_cloud, first(split($param_location,":")), "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, first(split($param_location,":")), "mci_mapping"), "mci_rev"))
+  cloud map( $map_cloud, $param_location, "cloud" )
+  datacenter map($map_cloud, $param_location, "zone")
+  instance_type map($map_cloud, $param_location, "instance_type")
+  ssh_key_href map($map_cloud, $param_location, "ssh_key")
+  placement_group_href map($map_cloud, $param_location, "pg")
+  security_group_hrefs map($map_cloud, $param_location, "sg") 
+  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
   server_template find(map($map_st, "app", "name"), revision: map($map_st, "app", "rev"))
   inputs do {
     'ephemeral_lvm/logical_volume_name' => 'text:ephemeral0',
@@ -297,7 +297,7 @@ end
 resource "sec_group", type: "security_group" do
   name join(["sec_group-",@@deployment.href])
   description "CAT security group."
-  cloud map( $map_cloud, first(split($param_location,":")), "cloud" )
+  cloud map( $map_cloud, $param_location, "cloud" )
 end
 
 resource "sec_group_rule_http", type: "security_group_rule" do
@@ -395,12 +395,12 @@ end
 define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $map_db_creds, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do 
 
   # Need the cloud name later on
-  $cloud_name = map( $map_cloud, first(split($param_location,":")), "cloud" )
+  $cloud_name = map( $map_cloud, $param_location, "cloud" )
 
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call cloud.checkCloudSupport($cloud_name, first(split($param_location,":")))
+  call cloud.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
   call server_templates.importServerTemplate($map_st)
@@ -529,29 +529,6 @@ define install_appcode($param_appcode, @app_server) do
   call run_recipe_inputs(@app_server, "rs-application_php::default", {})
 end
 
-# Scale out (add) server
-define scale_out_array(@app_server, @lb_server) do
-  task_label("Scale out application server.")
-  @task = @app_server.launch(inputs: {})
-
-  $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
-  sleep_until all?(@app_server.current_instances().state[], $wake_condition)
-  if !all?(@app_server.current_instances().state[], "operational")
-    raise "Some instances failed to start"    
-  end
-  
-  # Now execute post launch scripts to finish setting up the server.
-  concurrent do
-    call run_recipe_inputs(@app_server, "rs-application_php::collectd", {})  
-    call run_recipe_inputs(@app_server, "rs-application_php::tags", {})  
-  end
-  
-  # Tell the load balancer to find the new app server
-  call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
-    
-  call apply_costcenter_tag(@app_server)
-
-end
 
 # Apply the cost center tag to the server array instance(s)
 define apply_costcenter_tag(@server_array) do
@@ -573,22 +550,4 @@ define apply_costcenter_tag(@server_array) do
   rs_cm.tags.multi_add(resource_hrefs: @server_array.current_instances().href[], tags: [$costcenter_tag])
 end
 
-# Scale in (remove) server
-define scale_in_array(@app_server) do
-  task_label("Scale in web server array.")
-
-  @terminable_servers = select(@app_server.current_instances(), {"state":"/^(operational|stranded)/"})
-  if size(@terminable_servers) > 0 
-    # Terminate the oldest instance in the array.
-    @server_to_terminate = first(@terminable_servers)
-    # Have it tell the load balancer of it's impending demise
-    call run_recipe_inputs(@server_to_terminate, "rs-application_php::application_backend_detached", {})
-    # Cause that much anticipated demise
-    @server_to_terminate.terminate()
-    # Wait for the server to be no longer of this mortal coil
-    sleep_until(@server_to_terminate.state != "operational" )
-  else
-    rs_cm.audit_entries.create(audit_entry: {auditee_href: @app_server.href, summary: "Scale In: No terminable server currently found in the server array"})
-  end
-end
 
