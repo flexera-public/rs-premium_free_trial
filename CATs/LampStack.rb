@@ -162,8 +162,8 @@ mapping "map_mci" do {
     "mci_rev" => "9",
   },
   "Public" => { # all other clouds
-    "mci_name" => "RightImage_CentOS_6.6_x64_v14.2",
-    "mci_rev" => "24",
+    "mci_name" => "RightImage_Ubuntu_14.04_x64_v14.2",
+    "mci_rev" => "11",
   }
 } end
 
@@ -477,16 +477,17 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
       provision(@placement_group)
   end
   
-  # Launch the servers concurrently
+  # Launch servers concurrently
   concurrent return  @lb_server, @app_server, @db_server do 
     sub task_name:"Launch DB" do
-      task_label("Launching DB")
+      task_label("Launching DB - in Azure")
       $db_retries = 0 
       sub on_error: handle_retries($db_retries) do
         $db_retries = $db_retries + 1
         provision(@db_server)
       end
     end
+    
     sub task_name:"Launch LB" do
       task_label("Launching LB")
       $lb_retries = 0 

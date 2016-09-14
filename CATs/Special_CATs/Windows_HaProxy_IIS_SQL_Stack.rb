@@ -172,7 +172,7 @@ mapping "map_cloud" do {
   },
   "Azure-USA" => {   
    "provider" => "Azure",
-    "cloud" => "Azure East US",
+    "cloud" => "Azure West US",
   },
 }
 end
@@ -265,7 +265,7 @@ resource "db_1", type: "server" do
   instance_type  map( $map_instance_type, map( $map_cloud, $param_location,"provider"), $param_performance)
   server_template find("Database Manager for Microsoft SQL Server (13.5.1-LTS) vTLS")
   ssh_key_href switch($inAWS, map($map_account, map($map_current_account, "current_account_name", "current_account"), "ssh_key"), null)
-#usedefault  placement_group switch($inAzure, map($map_account, map($map_current_account, "current_account_name", "current_account"), "placement_group"), null)  
+  placement_group_href switch($inAzure, map($map_account, map($map_current_account, "current_account_name", "current_account"), "placement_group"), null)  
   security_group_hrefs switch($inAWS, map($map_account, map($map_current_account, "current_account_name", "current_account"), "security_group"), null)
     inputs do {
       "ADMIN_PASSWORD" => "cred:WINDOWS_ADMIN_PASSWORD",
@@ -295,7 +295,7 @@ resource "server_array_1", type: "server_array" do
   instance_type  map( $map_instance_type, map( $map_cloud, $param_location,"provider"), $param_performance)
   server_template find("Microsoft IIS App Server (v13.5.0-LTS)")
   ssh_key_href switch($inAWS, map($map_account, map($map_current_account, "current_account_name", "current_account"), "ssh_key"), null)
-#usedefault  placement_group switch($inAzure, map($map_account, map($map_current_account, "current_account_name", "current_account"), "placement_group"), null)
+  placement_group_href switch($inAzure, map($map_account, map($map_current_account, "current_account_name", "current_account"), "placement_group"), null)
   security_group_hrefs switch($inAWS, map($map_account, map($map_current_account, "current_account_name", "current_account"), "security_group"), null)
   inputs do {
     "APPLICATION_LISTENER_PORT" => "text:80", # allows the links on the site to work using the default configuraiton.
