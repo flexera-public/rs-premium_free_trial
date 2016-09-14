@@ -251,7 +251,7 @@ resource "lb_1", type: "server" do
   instance_type  map( $map_instance_type, map( $map_cloud, $param_location,"provider"), $param_performance)
   server_template find("Load Balancer with HAProxy (v13.5.11-LTS)", revision: 25)
   ssh_key_href switch($inAWS, map($map_account, map($map_current_account, "current_account_name", "current_account"), "ssh_key"), null)
-#usedefault  placement_group switch($inAzure, map($map_account, map($map_current_account, "current_account_name", "current_account"), "placement_group"), null)
+  placement_group_href switch($inAzure, map($map_account, map($map_current_account, "current_account_name", "current_account"), "placement_group"), null)
   security_group_hrefs switch($inAWS, map($map_account, map($map_current_account, "current_account_name", "current_account"), "security_group"), null)
   multi_cloud_image_href switch($inAWS, map($map_account, map($map_current_account, "current_account_name", "current_account"), "lb_image_href"), null)  
   inputs do {
