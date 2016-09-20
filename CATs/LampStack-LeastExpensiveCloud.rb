@@ -24,7 +24,7 @@
 
 
 name 'D) App Stack - Least Expensive Cloud'
-rs_ca_ver 20131202
+rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/best_price_new.png)
 
 Launches a scalable LAMP stack that supports application code updates in least expensive PUBLIC or PRIVATE cloud based on user-specified CPU and RAM."
@@ -32,17 +32,14 @@ long_description "Launches a 3-tier LAMP stack in the least expensive environmen
 Clouds Supported: <B>AWS, Azure, Google, VMware</B>\n
 Pro Tip: Select CPU=1 and RAM=1 to end up in the VMware environment."
 
+import "common/parameters"
+import "common/lamp_mappings"
+
+
+
 ##################
 # User inputs    #
 ##################
-#parameter "param_location" do 
-#  category "Deployment Options"
-#  label "Cloud" 
-#  type "string" 
-#  allowed_values "AWS", "Azure", "Google", "VMware" 
-#  default "AWS"
-#end
-
 parameter "param_cpu" do 
   category "User Inputs"
   label "Minimum Number of vCPUs" 
@@ -59,12 +56,8 @@ parameter "param_ram" do
   default "2"
 end
 
-parameter "param_costcenter" do 
-  category "User Inputs"
-  label "Cost Center" 
-  type "string" 
-  allowed_values "Development", "QA", "Production"
-  default "Development"
+parameter "param_costcenter" do
+  like $parameters.param_costcenter
 end
 
 parameter "param_appcode" do 
@@ -241,45 +234,19 @@ mapping "map_cloud" do {
 end
 
 # Mapping of which ServerTemplates and Revisions to use for each tier.
-mapping "map_st" do {
-  "lb" => {
-    "name" => "Load Balancer with HAProxy (v14.1.1)",
-    "rev" => "43",
-  },
-  "app" => {
-    "name" => "PHP App Server (v14.1.1)",
-    "rev" => "44",
-  },
-  "db" => {
-    "name" => "Database Manager for MySQL (v14.1.1)",
-    "rev" => "56",
-  }
-} end
+mapping "map_st" do   
+  like $lamp_mappings.map_st
+end
 
-mapping "map_mci" do {
-  "VMware" => { # vSphere 
-    "mci_name" => "RightImage_CentOS_6.6_x64_v14.2_VMware",
-    "mci_rev" => "9",
-  },
-  "Public" => { # all other clouds
-    "mci_name" => "RightImage_CentOS_6.6_x64_v14.2",
-    "mci_rev" => "24",
-  }
-} end
+mapping "map_mci" do 
+  like $lamp_mappings.map_mci
+end
 
 # Mapping of names of the creds to use for the DB-related credential items.
 # Allows for easier maintenance down the road if needed.
-mapping "map_db_creds" do {
-  "root_password" => {
-    "name" => "CAT_MYSQL_ROOT_PASSWORD",
-  },
-  "app_username" => {
-    "name" => "CAT_MYSQL_APP_USERNAME",
-  },
-  "app_password" => {
-    "name" => "CAT_MYSQL_APP_PASSWORD",
-  }
-} end
+mapping "map_db_creds" do
+  like $lamp_mappings.map_db_creds
+end
 
 
 ############################
