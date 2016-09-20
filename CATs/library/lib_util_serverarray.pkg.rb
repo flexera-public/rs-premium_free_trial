@@ -39,7 +39,7 @@ define scale_in_array(@app_server) do
     # Terminate the oldest instance in the array.
     @server_to_terminate = first(@terminable_servers)
     # Have it tell the load balancer of it's impending demise
-    call run_recipe_inputs(@server_to_terminate, "rs-application_php::application_backend_detached", {})
+    call server_templates.run_recipe_no_inputs(@server_to_terminate, "rs-application_php::application_backend_detached")
     # Cause that much anticipated demise
     @server_to_terminate.terminate()
     # Wait for the server to be no longer of this mortal coil

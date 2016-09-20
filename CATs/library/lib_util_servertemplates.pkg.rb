@@ -4,6 +4,8 @@ short_description "RCL definitions and resources for working with ServerTemplate
 
 package "util/server_templates"
 
+import "util/err"
+
 permission "import_servertemplates" do
   actions   "rs_cm.import"
   resources "rs_cm.publications"
@@ -62,7 +64,11 @@ define get_instance_collection(@target) return @target_instances do
   $target_type = type(@target)
   if equals?($target_type, "rs_cm.servers")
     @target_instances = @target.current_instance()
-  else
+  elsif equals?($target_type, "rs_cm.server_arrays")
     @target_instances = @target.current_instances()
+  elsif equals?($target_type, "rs_cm.instances")
+    @target_instances = @target
+  else
+    call err.log("get_instance_collection: Unrecognized target type: "+to_s($target_type), to_s(@target))
   end
 end

@@ -18,20 +18,6 @@ define createCreds($credname_array) do
 end
 
 
-# Used to get a credential
-# Requires admin permission
-define get_cred($cred_name) return $cred_value do
-  @cred = rs_cm.credentials.get(filter: [ "name=="+$cred_name ], view: "sensitive") 
-  $cred_hash = to_object(@cred)
-  $cred_value = ""
-  foreach $detail in $cred_hash["details"] do
-    if $detail["name"] == $cred_name
-      $cred_value = $detail["value"]
-    end
-  end
-end
-
-
 
 
 
