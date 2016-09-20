@@ -1,5 +1,5 @@
 #Copyright 2015 RightScale
-#
+#x
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
@@ -23,7 +23,7 @@
 
 # Required prolog
 name 'B) Corporate Standard Windows Server'
-rs_ca_ver 20131202
+rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/windows.png) 
 
 Get a Windows Server VM in any of our supported public or private clouds"
@@ -31,19 +31,26 @@ long_description "Allows you to select different windows server types and cloud 
 \n
 Clouds Supported: <B>AWS, Azure</B>"
 
+import "common/parameters"
+import "common/mappings"
+import "common/resources", as: "common_resources"
+import "common/conditions"
+import "util/server_templates"
+import "util/cloud"
+import "util/account"
+
 ##################
 # User inputs    #
 ##################
-parameter "param_location" do 
-  category "User Inputs"
-  label "Cloud" 
-  type "string" 
+
+parameter "param_location" do
+  like $parameters.param_location
   allowed_values "AWS", "Azure"
   default "AWS"
 end
 
 parameter "param_servertype" do
-  category "User Inputs"
+  category "Deployment Options"
   label "Windows Server Type"
   type "list"
   allowed_values "Windows 2008R2 Base Server",
@@ -57,12 +64,7 @@ parameter "param_servertype" do
 end
 
 parameter "param_instancetype" do
-  category "User Inputs"
-  label "Server Performance Level"
-  type "list"
-  allowed_values "Standard Performance",
-    "High Performance"
-  default "Standard Performance"
+  like $parameters.param_instancetype
 end
 
 parameter "param_username" do 
@@ -88,10 +90,7 @@ end
 
 parameter "param_costcenter" do 
   category "User Inputs"
-  label "Cost Center" 
-  type "string" 
-  allowed_values "Development", "QA", "Production"
-  default "Development"
+  like $parameters.param_costcenter
 end
 
 
@@ -107,60 +106,13 @@ end
 ##############
 # MAPPINGS   #
 ##############
-mapping "map_cloud" do {
-  "AWS" => {
-    "cloud" => "EC2 us-east-1",
-    "zone" => null, # We don't care which az AWS decides to use.
-    "instance_type" => "m3.medium",
-    "sg" => '@sec_group',  
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "Azure" => {   
-    "cloud" => "Azure East US",
-    "zone" => null,
-    "instance_type" => "D1",
-    "sg" => null, 
-    "ssh_key" => null,
-    "pg" => "@placement_group",
-    "mci_mapping" => "Public",
-  },
-  "Google" => {
-    "cloud" => "Google",
-    "zone" => "us-central1-c", # launches in Google require a zone
-    "instance_type" => "n1-standard-2",
-    "sg" => '@sec_group',  
-    "ssh_key" => null,
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "VMware" => {
-    "cloud" => "VMware Private Cloud",
-    "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified  
-    "instance_type" => "large",
-    "sg" => null, 
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "VMware",
-  }
-}
+mapping "map_cloud" do 
+  like $mappings.map_cloud
 end
 
-mapping "map_instancetype" do {
-  "Standard Performance" => {
-    "AWS" => "m3.medium",
-    "Azure" => "D1",
-    "Google" => "n1-standard-1",
-    "VMware" => "small",
-  },
-  "High Performance" => {
-    "AWS" => "m3.large",
-    "Azure" => "D2",
-    "Google" => "n1-standard-2",
-    "VMware" => "large",
-  }
-} end
+mapping "map_instancetype" do 
+  like $mappings.map_instancetype
+end
 
 mapping "map_st" do {
   "windows_server" => {
@@ -206,23 +158,23 @@ mapping "map_mci" do {
 
 # Used to decide whether or not to pass an SSH key or security group when creating the servers.
 condition "needsSshKey" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "VMware"))
+  like $conditions.needsSshKey
 end
 
 condition "needsSecurityGroup" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google"))
-end
-
-condition "invSphere" do
-  equals?($param_location, "VMware")
-end
-
-condition "inAzure" do
-  equals?($param_location, "Azure")
+  like $conditions.needsSecurityGroup
 end
 
 condition "needsPlacementGroup" do
-  equals?($param_location, "Azure")
+  like $conditions.needsPlacementGroup
+end
+
+condition "invSphere" do
+  like $conditions.invSphere
+end
+
+condition "inAzure" do
+  like $conditions.inAzure
 end 
 
 ############################
@@ -253,50 +205,31 @@ end
 # to provision the security group and rules.
 resource "sec_group", type: "security_group" do
   condition $needsSecurityGroup
-
-  name join(["WindowsServerSecGrp-",@@deployment.href])
-  description "Windows Server security group."
-  cloud map( $map_cloud, $param_location, "cloud" )
+  like @common_resources.sec_group
 end
 
 resource "sec_group_rule_rdp", type: "security_group_rule" do
   condition $needsSecurityGroup
-
-  name "Windows Server RDP Rule"
-  description "Allow RDP access."
-  source_type "cidr_ips"
-  security_group @sec_group
-  protocol "tcp"
-  direction "ingress"
-  cidr_ips "0.0.0.0/0"
-  protocol_details do {
-    "start_port" => "3389",
-    "end_port" => "3389"
-  } end
+  like @common_resources.sec_group_rule_rdp
 end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
   condition $needsSshKey
-
-  name join(["sshkey_", last(split(@@deployment.href,"/"))])
-  cloud map($map_cloud, $param_location, "cloud")
+  like @common_resources.ssh_key
 end
 
 ### Placement Group ###
 resource "placement_group", type: "placement_group" do
   condition $needsPlacementGroup
-
-  name last(split(@@deployment.href,"/"))
-  cloud map($map_cloud, $param_location, "cloud")
-end 
-
+  like @common_resources.placement_group
+end
+ 
 ##################
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  actions   "rs.import"
-  resources "rs.publications"
+  like $server_templates.import_servertemplates
 end
 
 ####################
@@ -323,7 +256,8 @@ operation "terminate" do
   definition "pre_auto_terminate"
 end
 
-operation "Update Server Password" do
+operation "update_server_password" do
+  label "Update Server Password"
   description "Update/reset password."
   definition "update_password"
 end
@@ -342,14 +276,14 @@ define pre_auto_launch($map_cloud, $param_location, $param_password, $map_st) do
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call checkCloudSupport($cloud_name, $param_location)
+  call cloud.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call importServerTemplate($map_st)
+  call server_templates.importServerTemplate($map_st)
     
   # Create the Admin Password credential used for the server based on the user-entered password.
   $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
-  rs.credentials.create({"name":$credname, "value": $param_password})
+  rs_cm.credentials.create({"name":$credname, "value": $param_password})
 
 end
 
@@ -357,18 +291,18 @@ define enable(@windows_server, $param_costcenter, $inAzure) return $server_ip_ad
   
   # Tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
-  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
   # If deployed in Azure one needs to provide the port mapping that Azure uses.
   if $inAzure
-     @bindings = rs.clouds.get(href: @windows_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @windows_server.current_instance().href])
+     @bindings = rs_cm.clouds.get(href: @windows_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @windows_server.current_instance().href])
      @binding = select(@bindings, {"private_port":3389})
      $server_ip_address = join([to_s(@windows_server.current_instance().public_ip_addresses[0]),":",@binding.public_port])
   else
     # If not in Azure, then we can actually provide the SSH link like that found in CM.
-    call find_shard(@@deployment) retrieve $shard_number
-    call find_account_number() retrieve $account_number
-    call get_server_access_link(@windows_server, "RDP", $shard_number, $account_number) retrieve $server_ip_address
+    call account.find_shard(@@deployment) retrieve $shard_number
+    call account.find_account_number() retrieve $account_number
+    call account.get_server_access_link(@windows_server, "RDP", $shard_number, $account_number) retrieve $server_ip_address
   end
 end 
 
@@ -379,20 +313,13 @@ define update_password(@windows_server, $param_password) do
   if $param_password
     $cred_name = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
     # update the credential
-    rs.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: join(["Updating credential, ", $cred_name])})
-    @cred = rs.credentials.get(filter: [ join(["name==",$cred_name]) ])
+    rs_cm.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: join(["Updating credential, ", $cred_name])})
+    @cred = rs_cm.credentials.get(filter: [ join(["name==",$cred_name]) ])
     @cred.update(credential: {"value" : $param_password})
   end
   
   # Now run the set admin script which will use the newly updated credential.
-  $script_name = "SYS Set admin account (v13.5.0-LTS)"
-  @script = rs.right_scripts.get(filter: [ join(["name==",$script_name]) ])
-  $right_script_href=@script.href
-  @task = @windows_server.current_instance().run_executable(right_script_href: $right_script_href, inputs: {})
-  sleep_until(@task.summary =~ "^(completed|failed)")
-  if @task.summary =~ "failed"
-    raise "Failed to run " + $right_script_href
-  end  
+  call server_templates.run_script_no_inputs(@windows_server, "SYS Set admin account (v13.5.0-LTS)")
 end
 
 # Delete the credential created for the windows password
@@ -400,135 +327,8 @@ define pre_auto_terminate() do
   
   # Delete the cred we created for the user-provided password
   $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
-  @cred=rs.credentials.get(filter: [join(["name==",$credname])])
+  @cred=rs_cm.credentials.get(filter: [join(["name==",$credname])])
   @cred.destroy()
   
 end
-
-# Checks if the account supports the selected cloud
-define checkCloudSupport($cloud_name, $param_location) do
-  # Gather up the list of clouds supported in this account.
-  @clouds = rs.clouds.get()
-  $supportedClouds = @clouds.name[] # an array of the names of the supported clouds
-  
-  # Check if the selected/mapped cloud is in the list and yell if not
-  if logic_not(contains?($supportedClouds, [$cloud_name]))
-    raise "Your trial account does not support the "+$param_location+" cloud. Contact RightScale for more information on how to enable access to that cloud."
-  end
-end
-
-# Imports the server templates found in the given map.
-# It assumes a "name" and "rev" mapping
-define importServerTemplate($stmap) do
-  foreach $st in keys($stmap) do
-    $server_template_name = map($stmap, $st, "name")
-    $server_template_rev = map($stmap, $st, "rev")
-    @pub_st=rs.publications.index(filter: ["name=="+$server_template_name, "revision=="+$server_template_rev])
-    @pub_st.import()
-  end
-end
-
-define handle_retries($attempts) do
-  if $attempts < 3
-    $_error_behavior = "retry"
-    sleep(60)
-  else
-    $_error_behavior = "skip"
-  end
-end
-
-# Returns either an RDP or SSH link for the given server.
-# This link can be provided as an output for a CAT and the user can select it to to get the
-# RDP or SSH file just like in Cloud Management.
-#
-# INPUTS:
-#   @server - server resource for which you want the link
-#   $link_type - "SSH" or "RDP" to indicate which type of access link you want back.
-#   $shard - the API shard to use. This can be found using the "find_shard.rb" definition.
-#   $account_number - the account number. This can be found using the "find_account_number.rb" definition.
-#
-define get_server_access_link(@server, $link_type, $shard, $account_number) return $server_access_link do
-  
-  $rs_endpoint = "https://us-"+$shard+".rightscale.com"
-    
-  $instance_href = @server.current_instance().href
-  
-  $response = http_get(
-    url: $rs_endpoint+"/api/instances",
-    headers: { 
-    "X-Api-Version": "1.6",
-    "X-Account": $account_number
-    }
-   )
-  
-  $instances = $response["body"]
-  
-  $instance_of_interest = select($instances, { "href" : $instance_href })[0]
-#  rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @server, summary: join(["instance of interest"]), detail: to_s($instance_of_interest)})
-    
-  $legacy_id = $instance_of_interest["legacy_id"]  
-
-  $cloud_id = $instance_of_interest["links"]["cloud"]["id"]
-  
-  $instance_public_ips = $instance_of_interest["public_ip_addresses"]
-  $instance_private_ips = $instance_of_interest["private_ip_addresses"]
-  $instance_ip = switch(empty?($instance_public_ips), to_s($instance_private_ips[0]), to_s($instance_public_ips[0]))
-#  rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @server, summary: join(["instance_ip: ", $instance_ip]), detail: ""})
-
-  $server_access_link_root = "https://my.rightscale.com/acct/"+$account_number+"/clouds/"+$cloud_id+"/instances/"+$legacy_id
-  
-  if $link_type == "RDP"
-    $server_access_link = $server_access_link_root +"/rdp?host=" + $instance_ip
-  elsif $link_type == "SSH"
-    $server_access_link = $server_access_link_root +"/managed_ssh.jnlp?host=" + $instance_ip
-  else
-    raise "Incorrect link_type, " + $link_type + ", passed to get_server_access_link()."
-  end
-  
-#  rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @server, summary: "access link", detail: $server_access_link})
-
-end
-
-
-# Returns the RightScale account number in which the CAT was launched.
-define find_account_number() return $rs_account_number do
-  $cloud_accounts = to_object(first(rs.cloud_accounts.get()))
-  @info = first(rs.cloud_accounts.get())
-  $info_links = @info.links
-  $rs_account_info = select($info_links, { "rel": "account" })[0]
-  $rs_account_href = $rs_account_info["href"]  
-    
-  $rs_account_number = last(split($rs_account_href, "/"))
-  #rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: "rs_account_number" , detail: to_s($rs_account_number)})
-end
-  
-# Returns the RightScale shard for the account the given CAT is launched in.
-# It relies on the fact that when a CAT is launched, the resultant deployment description includes a link
-# back to Self-Service. 
-# This link is exploited to identify the shard.
-# Of course, this is somewhat dangerous because if the deployment description is changed to remove that link, 
-# this code will not work.
-# Similarly, since the deployment description is also based on the CAT description, if the CAT author or publisher
-# puts something like "selfservice-8" in it for some reason, this code will likely get confused.
-# However, for the time being it's fine.
-define find_shard(@deployment) return $shard_number do
-  
-  $deployment_description = @deployment.description
-  #rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: "deployment description" , detail: $deployment_description})
-  
-  # initialize a value
-  $shard_number = "UNKNOWN"
-  foreach $word in split($deployment_description, "/") do
-    if $word =~ "selfservice-" 
-    #rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: join(["found word:",$word]) , detail: ""}) 
-      foreach $character in split($word, "") do
-        if $character =~ /[0-9]/
-          $shard_number = $character
-          #rs.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: join(["found shard:",$character]) , detail: ""}) 
-        end
-      end
-    end
-  end
-end
-
 

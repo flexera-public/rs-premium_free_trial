@@ -279,7 +279,7 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $w
   
   # For some reason in Azure, the docker containers - esp wordpress - don't get started as expected.
   # Although this has only been seen in Azure we'll force a start in all clouds - just to be safe.
-  call server_templates.run_script("APP docker services up", @docker_server)
+  call server_templates.run_script_no_inputs(@docker_server, "APP docker services up")
 
 end
 

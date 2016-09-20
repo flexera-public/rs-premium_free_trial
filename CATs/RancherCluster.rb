@@ -27,12 +27,18 @@
 # Support more clouds. This would require coordinating with the ST author to add images in other clouds.
 
 name 'Rancher Cluster'
-rs_ca_ver 20131202
+rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_logo.png) ![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
 
 Launches a Rancher cluster of Docker hosts."
 long_description "Launches a Rancher cluster.\n
 Clouds Supported: <B>AWS</B>"
+
+import "common/mappings"
+import "common/conditions"
+import "common/resources", as: "common_resources"
+import "util/server_templates"
+import "util/cloud"
 
 ##################
 # User inputs    #
@@ -54,25 +60,6 @@ parameter 'param_qty' do
   max_value 10
   default 3
 end
-
-# Just hardcoding the rancher creds for now to make things easier for the user
-#parameter "rancher_ui_username" do
-#  category "Cluster Options"
-#  type "string"
-#  label "Rancher UI Username"
-#  description "Enter username for Rancher UI"
-#  default "rightscale"
-#end
-#
-#parameter "rancher_ui_password" do
-#  category "Cluster Options"
-#  type "string"
-#  label "Rancher UI Password"
-#  description "Enter password for Rancher UI. (Leave blank for default password \"rightscale\".)"
-#  default "rightscale"
-#  no_echo "true"
-#end
-
 
 parameter "num_add_nodes" do
   category "Cluster Options"
@@ -149,44 +136,8 @@ end
 ##############
 
 # Mapping and abstraction of cloud-related items.
-mapping "map_cloud" do {
-  "AWS" => {
-    "cloud" => "EC2 us-east-1",
-    "zone" => null, # We don't care which az AWS decides to use.
-    "instance_type" => "m3.medium",
-    "sg" => '@sec_group',  
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "Azure" => {   
-    "cloud" => "Azure East US",
-    "zone" => null,
-    "instance_type" => "medium",
-    "sg" => null, 
-    "ssh_key" => null,
-    "pg" => "@placement_group",
-    "mci_mapping" => "Public",
-  },
-  "Google" => {
-    "cloud" => "Google",
-    "zone" => "us-central1-c", # launches in Google require a zone
-    "instance_type" => "n1-standard-2",
-    "sg" => '@sec_group',  
-    "ssh_key" => null,
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "VMware" => {
-    "cloud" => "VMware Private Cloud",
-    "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified  
-    "instance_type" => "large",
-    "sg" => null, 
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "VMware",
-  }
-}
+mapping "map_cloud" do 
+  like $mappings.map_cloud
 end
 
 # Mapping of which ServerTemplates and Revisions to use for each tier.
@@ -220,24 +171,24 @@ mapping "map_mci" do {
 
 # Used to decide whether or not to pass an SSH key or security group when creating the servers.
 condition "needsSshKey" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "VMware"))
+  like $conditions.needsSshKey
 end
 
 condition "needsSecurityGroup" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google"))
+  like $conditions.needsSecurityGroup
 end
 
 condition "needsPlacementGroup" do
-  equals?($param_location, "Azure")
+  like $conditions.needsPlacementGroup
 end
 
 condition "invSphere" do
-  equals?($param_location, "VMware")
+  like $conditions.invSphere
 end
 
 condition "inAzure" do
-  equals?($param_location, "Azure")
-end
+  like $conditions.inAzure
+end 
 
 ############################
 # RESOURCE DEFINITIONS     #
@@ -300,10 +251,13 @@ resource 'rancher_host', type: 'server_array' do
   } end
 end
 
+### Security Group Definitions ###
 resource "sec_group", type: "security_group" do
-  name join(["sec_group-",@@deployment.href])
-  description "CAT security group."
-  cloud map( $map_cloud, $param_location, "cloud" )
+  like @common_resources.sec_group
+end
+
+resource "sec_group_rule_ssh", type: "security_group_rule" do
+  like @common_resources.sec_group_rule_ssh
 end
 
 # Needed for Rancher UI and API access.
@@ -351,21 +305,6 @@ resource "sec_group_rule_http443", type: "security_group_rule" do
   } end
 end
 
-# Nice to have SSH access for debugging
-resource "sec_group_rule_ssh", type: "security_group_rule" do
-  name "CAT SSH Rule"
-  description "Allow SSH access."
-  source_type "cidr_ips"
-  security_group @sec_group
-  protocol "tcp"
-  direction "ingress"
-  cidr_ips "0.0.0.0/0"
-  protocol_details do {
-    "start_port" => "22",
-    "end_port" => "22"
-  } end
-end
-
 # UDP 500 and 4500 is needed for the Rancher overlay ipsec network.
 resource "sec_group_rule_udp500", type: "security_group_rule" do
   name "CAT UDP 500 Rule"
@@ -395,10 +334,10 @@ resource "sec_group_rule_udp4500", type: "security_group_rule" do
   } end
 end
 
+
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
-  name join(["sshkey_", last(split(@@deployment.href,"/"))])
-  cloud map($map_cloud, $param_location, "cloud")
+  like @common_resources.ssh_key
 end
 
 
@@ -406,8 +345,7 @@ end
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  actions   "rs.import"
-  resources "rs.publications"
+  like $server_templates.import_servertemplates
 end
 
 ####################
@@ -488,10 +426,10 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call checkCloudSupport($cloud_name, $param_location)
+  call cloud.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call importServerTemplate($map_st)
+  call server_templates.importServerTemplate($map_st)
   
   # Provision the resources
   
@@ -663,17 +601,8 @@ define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_comp
     'RANCHER_COMPOSE_RANCHER_YAML':join(['text:', $rancher_compose])
   }
   
-  # Find the script's href
-  $script_name = "Run rancher-compose"
-  @script = rs.right_scripts.get(filter: [ join(["name==",$script_name]) ])
-  $right_script_href=@script.href
-  
-  # Run the script on the Rancher Server
-  @task = @rancher_server.current_instance().run_executable(right_script_href: $right_script_href, inputs: $inp)
-  sleep_until(@task.summary =~ "^(completed|Completed|failed|Failed|aborted|Aborted)")
-  if @task.summary =~ "(failed|Failed|aborted|Aborted)"
-    raise "Failed to run RightScript, " + $script_name + " (" + $right_script_href + ")"
-  end 
+  call server_templates.run_script_no_inputs(@rancher_server, "Run rancher-compose")
+ 
 end
 
 # Delete specified application stack
@@ -872,28 +801,4 @@ define rancher_api(@rancher_server, $action, $api_uri, $message_part_returned) r
   end
 
 end
-####################
-# Helper Functions #
-####################
-# Checks if the account supports the selected cloud
-define checkCloudSupport($cloud_name, $param_location) do
-  # Gather up the list of clouds supported in this account.
-  @clouds = rs.clouds.get()
-  $supportedClouds = @clouds.name[] # an array of the names of the supported clouds
-  
-  # Check if the selected/mapped cloud is in the list and yell if not
-  if logic_not(contains?($supportedClouds, [$cloud_name]))
-    raise "Your trial account does not support the "+$param_location+" cloud. Contact RightScale for more information on how to enable access to that cloud."
-  end
-end
-  
-# Imports the server templates found in the given map.
-# It assumes a "name" and "rev" mapping
-define importServerTemplate($stmap) do
-  foreach $st in keys($stmap) do
-    $server_template_name = map($stmap, $st, "name")
-    $server_template_rev = map($stmap, $st, "rev")
-    @pub_st=rs.publications.index(filter: ["name=="+$server_template_name, "revision=="+$server_template_rev])
-    @pub_st.import()
-  end
-end
+

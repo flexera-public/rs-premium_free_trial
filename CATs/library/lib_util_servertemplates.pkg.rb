@@ -23,7 +23,7 @@ define importServerTemplate($stmap) do
 end
 
 # Runs a rightscript without specified inputs on the given target node 
-define run_script($script_name, @target) do
+define run_script_no_inputs(@target, $script_name) do
   @script = rs_cm.right_scripts.get(latest_only: true, filter: [ join(["name==",$script_name]) ])
   $right_script_href=@script.href
   

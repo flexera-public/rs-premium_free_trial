@@ -350,7 +350,7 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
   end
   
   # Now we re-run the manager script so the swarm manager will discover the swarm nodes.
-  call server_templates.run_script("APP docker swarm manage", @swarm_manager)
+  call server_templates.run_script_no_inputs(@swarm_manager, "APP docker swarm manage")
   
   # Now tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]

@@ -964,12 +964,25 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
    $cloud_best_price = 100000
    foreach $price_hash in $price_hash_array do
      
-     # Need to figure out which cloud vendor we have here
-     if contains?(keys($price_hash["priceable_resource"]), ["public_cloud_vendor_name"])
-        $found_cloud_vendor = $price_hash["priceable_resource"]["public_cloud_vendor_name"]
+   # Need to figure out which cloud vendor we have here
+   if contains?(keys($price_hash["priceable_resource"]), ["public_cloud_vendor_name"])
+      $found_cloud_vendor = $price_hash["priceable_resource"]["public_cloud_vendor_name"]
+   else
+     # get the cloud name and back into the "found_cloud_vendor" value so subsequent logic will work as expected.
+     # this is needed since the API may not always return a public_cloud_vendor_name value
+     $cloud_href = $price_hash["purchase_option"]["cloud_href"]
+     @cloud = rs.get(href: $cloud_href)
+     $cloud_name = @cloud.name
+     if $cloud_name =~ /Azure/
+       $found_cloud_vendor = "Microsoft Azure"
+     elsif $cloud_name =~ /Google/
+       $found_cloud_vendor = "Google"
+     elsif $cloud_name =~ /EC2/
+       $found_cloud_vendor = "Amazon Web Services"
      else
-        $found_cloud_vendor = "VMware"
+       $found_cloud_vendor = "VMware"
      end
+   end
          
 #     call audit_log(join(["found vendor: ", $found_cloud_vendor]), "")
 
