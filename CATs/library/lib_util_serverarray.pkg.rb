@@ -4,10 +4,12 @@ short_description "RCL definitions and resources for working with ServerArrays"
 
 package "util/server_array"
 
+import "util/server_templates"
+
 # Scale out (add) server
 define scale_out_array(@app_server, @lb_server) do
   task_label("Scale out application server.")
-  @task = @app_server.launch(inputs: {})
+  @task = @app_server.launch()
 
   $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
   sleep_until all?(@app_server.current_instances().state[], $wake_condition)
@@ -17,12 +19,12 @@ define scale_out_array(@app_server, @lb_server) do
   
   # Now execute post launch scripts to finish setting up the server.
   concurrent do
-    call run_recipe_inputs(@app_server, "rs-application_php::collectd", {})  
-    call run_recipe_inputs(@app_server, "rs-application_php::tags", {})  
+    call server_templates.run_recipe_no_inputs(@app_server, "rs-application_php::collectd")  
+    call server_templates.run_recipe_no_inputs(@app_server, "rs-application_php::tags")  
   end
   
   # Tell the load balancer to find the new app server
-  call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
+  call server_templates.run_recipe_no_inputs(@lb_server, "rs-haproxy::frontend")
     
   call apply_costcenter_tag(@app_server)
 
@@ -43,7 +45,7 @@ define scale_in_array(@app_server) do
     # Wait for the server to be no longer of this mortal coil
     sleep_until(@server_to_terminate.state != "operational" )
   else
-    rs.audit_entries.create(audit_entry: {auditee_href: @app_server.href, summary: "Scale In: No terminable server currently found in the server array"})
+    rs_cm.audit_entries.create(audit_entry: {auditee_href: @app_server.href, summary: "Scale In: No terminable server currently found in the server array"})
   end
   
 end

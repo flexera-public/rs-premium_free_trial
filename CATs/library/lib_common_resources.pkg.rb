@@ -13,7 +13,7 @@ import "common/conditions"
 # to provision the security group and rules.
 resource "sec_group", type: "security_group" do
   name join(["SecGrp-",last(split(@@deployment.href,"/"))])
-  description "Linux Server security group."
+  description "Server security group."
   cloud map( $map_cloud, $param_location, "cloud" )
 end
 

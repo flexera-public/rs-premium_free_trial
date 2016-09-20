@@ -1,5 +1,5 @@
 #Copyright 2015 RightScale
-#
+#x
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
@@ -32,10 +32,10 @@ Clouds Supported: <B>AWS, Azure, Google, VMware</B>"
 
 import "common/parameters"
 import "common/mappings"
-import "common/resources"
+import "common/resources", as: "common_resources"
 import "common/conditions"
 import "util/server_templates"
-import "util/clouds"
+import "util/cloud"
 
 ##################
 # User inputs    #
@@ -94,7 +94,7 @@ mapping "map_cloud" do
   like $mappings.map_cloud
 end
 
-mapping "map_instancetype" do {
+mapping "map_instancetype" do 
   like $mappings.map_instancetype
 end
 
@@ -146,24 +146,24 @@ end
 # to provision the security group and rules.
 resource "sec_group", type: "security_group" do
   condition $needsSecurityGroup
-  like @resources.sec_group
+  like @common_resources.sec_group
 end
 
 resource "sec_group_rule_ssh", type: "security_group_rule" do
   condition $needsSecurityGroup
-  like @resources.sec_group_rule_ssh
+  like @common_resources.sec_group_rule_ssh
 end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
   condition $needsSshKey
-  like @resources.ssh_key
+  like @common_resources.ssh_key
 end
 
 ### Placement Group ###
 resource "placement_group", type: "placement_group" do
   condition $needsPlacementGroup
-  like @resources.placement_group
+  like @common_resources.placement_group
 end 
 
 ##################
