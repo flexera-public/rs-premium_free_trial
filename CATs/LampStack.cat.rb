@@ -197,7 +197,7 @@ end
 ####################
 operation "launch" do 
   description "Concurrently launch the servers" 
-  definition "lamp.launch_servers"
+  definition "lamp.launcher"
   output_mappings do {
     $site_url => $site_link,
     $lb_status => $lb_status_link,
