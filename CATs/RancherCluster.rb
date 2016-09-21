@@ -39,6 +39,7 @@ import "common/conditions"
 import "common/resources", as: "common_resources"
 import "util/server_templates"
 import "util/cloud"
+import "util/err"
 
 ##################
 # User inputs    #
@@ -377,7 +378,8 @@ operation 'enable' do
   end
 end
 
-operation 'Launch an Application Stack' do
+operation 'launch_app_stack' do
+  label 'Launch an Application Stack'
   description "Launch an application stack"
   definition "deploy_stack"
   
@@ -394,7 +396,8 @@ operation 'Launch an Application Stack' do
   end
 end
 
-operation 'Delete an Application Stack' do
+operation 'delete_app_stack' do
+  label 'Delete an Application Stack'
   description "Delete an application stack"
   definition "delete_stack"
   hash = {}
@@ -410,7 +413,8 @@ operation 'Delete an Application Stack' do
   end
 end
 
-operation "Add Nodes to Rancher Cluster" do
+operation "add_nodes" do
+  label "Add Nodes to Rancher Cluster"
   description "Adds (scales out) an application tier server."
   definition "add_nodes"
 end
@@ -466,15 +470,15 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   # Test the API to make sure the server is ready
   call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
   while (type($body)  == 'string') do
-    rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response type", detail: to_s(type($body)))
-    rs.audit_entries.create(auditee_href: @@deployment, summary: "debug:  check api response contents", detail: to_s(inspect($body)))
+    call err.log("debug:  check api response type", to_s(type($body)))
+    call err.log("debug:  check api response contents", to_s(inspect($body)))
     sleep(15)
     call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
   end
 
   # Get the keys from the API
   call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
-  rs.audit_entries.create(auditee_href: @@deployment, summary: "debug: apikeys response type", detail: to_s(type($body)))
+  call err.log("debug: apikeys response type", to_s(type($body)))
   
   $publicValue = $body["publicValue"] # Public API key
   $secretValue = $body["secretValue"] # Secret API key
@@ -648,7 +652,7 @@ define add_nodes(@rancher_host, $num_add_nodes) do
   $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
   sleep_until all?(@rancher_host.current_instances().state[], $wake_condition)
   
-  rs.audit_entries.create(auditee_href: @@deployment, summary: "instance states after waking", detail: to_s(@rancher_host.current_instances().state[]))
+  call err.log("instance states after waking", to_s(@rancher_host.current_instances().state[]))
 
   if !all?(@rancher_host.current_instances().state[], "operational")
     raise "Some instances failed to start"    
