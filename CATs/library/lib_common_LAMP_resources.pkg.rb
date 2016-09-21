@@ -124,7 +124,7 @@ resource 'app_server', type: 'server_array' do
     },
     "alert_specific_params" => {
       "decision_threshold"   => 51,
-      "voters_tag_predicate" => "App Server"
+      "voters_tag_predicate" => join(['App-',last(split(@@deployment.href,"/"))])
     }
   } end
 end
