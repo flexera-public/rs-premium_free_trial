@@ -2,7 +2,7 @@ name "LIB - Cloud Utilities"
 rs_ca_ver 20160622
 short_description "RCL definitions for helping interact with clouds"
 
-package "util/cloud"
+package "pft/cloud_utilities"
 
 # Checks if the account supports the selected cloud
 define checkCloudSupport($cloud_name, $param_location) do

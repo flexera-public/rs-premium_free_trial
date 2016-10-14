@@ -34,12 +34,12 @@ Launches a Rancher cluster of Docker hosts."
 long_description "Launches a Rancher cluster.\n
 Clouds Supported: <B>AWS</B>"
 
-import "common/mappings"
-import "common/conditions"
-import "common/resources", as: "common_resources"
-import "util/server_templates"
-import "util/cloud"
-import "util/err"
+import "pft/mappings"
+import "pft/conditions"
+import "pft/resources", as: "common_resources"
+import "pft/server_templates_utilities"
+import "pft/cloud_utilities"
+import "pft/err_utilities"
 
 ##################
 # User inputs    #
@@ -346,7 +346,7 @@ end
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  like $server_templates.import_servertemplates
+  like $server_templates_utilities.import_servertemplates
 end
 
 ####################
@@ -430,10 +430,10 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call cloud.checkCloudSupport($cloud_name, $param_location)
+  call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call server_templates.importServerTemplate($map_st)
+  call server_templates_utilities.importServerTemplate($map_st)
   
   # Provision the resources
   
@@ -470,15 +470,15 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   # Test the API to make sure the server is ready
   call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
   while (type($body)  == 'string') do
-    call err.log("debug:  check api response type", to_s(type($body)))
-    call err.log("debug:  check api response contents", to_s(inspect($body)))
+    call err_utilities.log("debug:  check api response type", to_s(type($body)))
+    call err_utilities.log("debug:  check api response contents", to_s(inspect($body)))
     sleep(15)
     call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
   end
 
   # Get the keys from the API
   call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
-  call err.log("debug: apikeys response type", to_s(type($body)))
+  call err_utilities.log("debug: apikeys response type", to_s(type($body)))
   
   $publicValue = $body["publicValue"] # Public API key
   $secretValue = $body["secretValue"] # Secret API key
@@ -605,7 +605,7 @@ define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_comp
     'RANCHER_COMPOSE_RANCHER_YAML':join(['text:', $rancher_compose])
   }
   
-  call server_templates.run_script_no_inputs(@rancher_server, "Run rancher-compose")
+  call server_templates_utilities.run_script_no_inputs(@rancher_server, "Run rancher-compose")
  
 end
 
@@ -652,7 +652,7 @@ define add_nodes(@rancher_host, $num_add_nodes) do
   $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
   sleep_until all?(@rancher_host.current_instances().state[], $wake_condition)
   
-  call err.log("instance states after waking", to_s(@rancher_host.current_instances().state[]))
+  call err_utilities.log("instance states after waking", to_s(@rancher_host.current_instances().state[]))
 
   if !all?(@rancher_host.current_instances().state[], "operational")
     raise "Some instances failed to start"    

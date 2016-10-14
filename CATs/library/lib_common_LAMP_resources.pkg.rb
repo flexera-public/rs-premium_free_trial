@@ -2,12 +2,12 @@ name "LIB - Common LAMP resources"
 rs_ca_ver 20160622
 short_description "Resources that are commonly used in LAMP CATs"
 
-package "common/lamp_resources"
+package "pft/lamp_resources"
 
-import "common/mappings"
-import "common/lamp_mappings"
-import "common/conditions"
-import "common/parameters"
+import "pft/mappings"
+import "pft/lamp_mappings"
+import "pft/conditions"
+import "pft/parameters"
 
 ### Server Declarations ###
 resource 'lb_server', type: 'server' do

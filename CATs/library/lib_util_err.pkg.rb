@@ -2,7 +2,7 @@ name "LIB - Error Handling Utilities"
 rs_ca_ver 20160622
 short_description "RCL definitions for error handling functions"
 
-package "util/err"
+package "pft/err_utilities"
 
 # Used for retry mechanism
 define handle_retries($attempts) do

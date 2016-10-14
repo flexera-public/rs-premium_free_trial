@@ -2,8 +2,8 @@ name "LIB - Common conditions"
 rs_ca_ver 20160622
 short_description "Conditions that are commonly used across multiple CATs"
 
-package "common/conditions"
-import "common/parameters"
+package "pft/conditions"
+import "pft/parameters"
 
 condition "needsSshKey" do
   logic_or(equals?($param_location, "AWS"), equals?($param_location, "VMware"))

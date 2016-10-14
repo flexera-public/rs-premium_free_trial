@@ -30,19 +30,16 @@ Launches a 3-tier LAMP stack."
 long_description "Launches a 3-tier LAMP stack.\n
 Clouds Supported: <B>AWS, Azure</B>"
 
-import "common/parameters"
-import "common/lamp_parameters"
-import "common/mappings"
-import "common/lamp_mappings"
-import "common/conditions"
-import "common/resources"
-import "common/lamp_resources"
-import "util/server_templates"
-import "util/server_array"
-import "util/err"
-import "util/cloud"
-import "util/creds"
-import "definitions/lamp"
+import "pft/parameters"
+import "pft/lamp_parameters"
+import "pft/mappings"
+import "pft/lamp_mappings"
+import "pft/conditions"
+import "pft/resources"
+import "pft/lamp_resources"
+import "pft/server_templates_utilities"
+import "pft/server_array_utilities"
+import "pft/lamp_utilities"
 
 ##################
 # User inputs    #
@@ -189,7 +186,7 @@ end
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  like $server_templates.import_servertemplates
+  like $server_templates_utilities.import_servertemplates
 end
 
 ####################
@@ -197,7 +194,7 @@ end
 ####################
 operation "launch" do 
   description "Concurrently launch the servers" 
-  definition "lamp.launcher"
+  definition "lamp_utilities.launcher"
   output_mappings do {
     $site_url => $site_link,
     $lb_status => $lb_status_link,
@@ -207,19 +204,19 @@ end
 operation "update_app_code" do
   label "Update Application Code"
   description "Select and install a different repo and branch of code."
-  definition "lamp.install_appcode"
+  definition "lamp_utilities.install_appcode"
 end
 
 operation "scale_out" do
   label "Scale Out"
   description "Adds (scales out) an application tier server."
-  definition "server_array.scale_out_array"
+  definition "server_array_utilities.scale_out_array"
 end
 
 operation "scale_in" do
   label "Scale In"
   description "Scales in an application tier server."
-  definition "server_array.scale_in_array"
+  definition "server_array_utilities.scale_in_array"
 end
 
 

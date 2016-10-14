@@ -2,7 +2,7 @@ name "LIB - Common parameters"
 rs_ca_ver 20160622
 short_description "Parameters that are commonly used across multiple CATs"
 
-package "common/parameters"
+package "pft/parameters"
 
 parameter "param_location" do 
   category "Deployment Options"

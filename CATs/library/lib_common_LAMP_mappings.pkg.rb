@@ -2,7 +2,7 @@ name "LIB - Common LAMP mappings"
 rs_ca_ver 20160622
 short_description "Mappings that are commonly used for LAMP stack CATs"
 
-package "common/lamp_mappings"
+package "pft/lamp_mappings"
 
 # Mapping of which ServerTemplates and Revisions to use for each tier.
 mapping "map_st" do {

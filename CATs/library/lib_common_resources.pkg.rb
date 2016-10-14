@@ -2,11 +2,11 @@ name "LIB - Common resources"
 rs_ca_ver 20160622
 short_description "Resources that are commonly used across CATs"
 
-package "common/resources"
+package "pft/resources"
 
-import "common/parameters"
-import "common/mappings"
-import "common/conditions"
+import "pft/parameters"
+import "pft/mappings"
+import "pft/conditions"
 
 ### Security Group Definitions ###
 # Note: Even though not all environments need or use security groups, the launch operation/definition will decide whether or not

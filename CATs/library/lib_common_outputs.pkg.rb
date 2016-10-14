@@ -2,8 +2,8 @@ name "LIB - Common outputs"
 rs_ca_ver 20160622
 short_description "Outputs that are commonly used across multiple CATs"
 
-package "common/outputs"
-import "common/conditions"
+package "pft/outputs"
+import "pft/conditions"
 
 output "vmware_note" do
   condition $invSphere

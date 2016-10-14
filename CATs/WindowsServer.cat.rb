@@ -31,13 +31,13 @@ long_description "Allows you to select different windows server types and cloud 
 \n
 Clouds Supported: <B>AWS, Azure</B>"
 
-import "common/parameters"
-import "common/mappings"
-import "common/resources", as: "common_resources"
-import "common/conditions"
-import "util/server_templates"
-import "util/cloud"
-import "util/account"
+import "pft/parameters"
+import "pft/mappings"
+import "pft/resources", as: "common_resources"
+import "pft/conditions"
+import "pft/server_templates_utilities"
+import "pft/cloud_utilities"
+import "pft/account_utilities"
 
 ##################
 # User inputs    #
@@ -229,7 +229,7 @@ end
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  like $server_templates.import_servertemplates
+  like $server_templates_utilities.import_servertemplates
 end
 
 ####################
@@ -276,10 +276,10 @@ define pre_auto_launch($map_cloud, $param_location, $param_password, $map_st) do
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call cloud.checkCloudSupport($cloud_name, $param_location)
+  call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call server_templates.importServerTemplate($map_st)
+  call server_templates_utilities.importServerTemplate($map_st)
     
   # Create the Admin Password credential used for the server based on the user-entered password.
   $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
@@ -300,9 +300,9 @@ define enable(@windows_server, $param_costcenter, $inAzure) return $server_ip_ad
      $server_ip_address = join([to_s(@windows_server.current_instance().public_ip_addresses[0]),":",@binding.public_port])
   else
     # If not in Azure, then we can actually provide the SSH link like that found in CM.
-    call account.find_shard(@@deployment) retrieve $shard_number
-    call account.find_account_number() retrieve $account_number
-    call account.get_server_access_link(@windows_server, "RDP", $shard_number, $account_number) retrieve $server_ip_address
+    call account_utilities.find_shard(@@deployment) retrieve $shard_number
+    call account_utilities.find_account_number() retrieve $account_number
+    call account_utilities.get_server_access_link(@windows_server, "RDP", $shard_number, $account_number) retrieve $server_ip_address
   end
 end 
 
@@ -319,7 +319,7 @@ define update_password(@windows_server, $param_password) do
   end
   
   # Now run the set admin script which will use the newly updated credential.
-  call server_templates.run_script_no_inputs(@windows_server, "SYS Set admin account (v13.5.0-LTS)")
+  call server_templates_utilities.run_script_no_inputs(@windows_server, "SYS Set admin account (v13.5.0-LTS)")
 end
 
 # Delete the credential created for the windows password

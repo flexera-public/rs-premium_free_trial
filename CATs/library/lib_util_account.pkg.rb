@@ -2,7 +2,7 @@ name "LIB - Account Utilities"
 rs_ca_ver 20160622
 short_description "RCL definitions for gathering account and related information."
 
-package "util/account"
+package "pft/account_utilities"
 
 
 

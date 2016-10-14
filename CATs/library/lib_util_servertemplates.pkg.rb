@@ -2,9 +2,9 @@ name "LIB - ServerTemplate Utilities"
 rs_ca_ver 20160622
 short_description "RCL definitions and resources for working with ServerTemplates"
 
-package "util/server_templates"
+package "pft/server_templates_utilities"
 
-import "util/err"
+import "pft/err_utilities"
 
 permission "import_servertemplates" do
   actions   "rs_cm.import"

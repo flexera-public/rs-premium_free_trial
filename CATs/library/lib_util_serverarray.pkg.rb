@@ -2,9 +2,9 @@ name "LIB - ServerArray Utilities"
 rs_ca_ver 20160622
 short_description "RCL definitions and resources for working with ServerArrays"
 
-package "util/server_array"
+package "pft/server_array_utilities"
 
-import "util/server_templates"
+import "pft/server_templates_utilities"
 
 # Scale out (add) server
 define scale_out_array(@app_server, @lb_server) do

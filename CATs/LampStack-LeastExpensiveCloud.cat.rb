@@ -32,15 +32,15 @@ long_description "Launches a 3-tier LAMP stack in the least expensive environmen
 Clouds Supported: <B>AWS, Azure, Google, VMware</B>\n
 Pro Tip: Select CPU=1 and RAM=1 to end up in the VMware environment."
 
-import "common/parameters"
-import "common/lamp_mappings"
-import "common/resources"
-import "common/lamp_resources"
-import "util/server_templates"
-import "util/server_array"
-import "util/err"
-import "util/creds"
-import "definitions/lamp"
+import "pft/parameters"
+import "pft/lamp_mappings"
+import "pft/resources"
+import "pft/lamp_resources"
+import "pft/server_templates_utilities"
+import "pft/server_array_utilities"
+import "pft/err_utilities"
+import "pft/creds_utilities"
+import "pft/lamp_utilities"
 
 ##################
 # User inputs    #
@@ -48,9 +48,10 @@ import "definitions/lamp"
 parameter "param_cpu" do 
   category "User Inputs"
   label "Minimum Number of vCPUs" 
-  type "string" 
+  type "number" 
   description "Minimum number of vCPUs needed for the application." 
-  default "2"
+  allowed_values 1, 2, 4, 8
+  default 2
 end
 
 parameter "param_ram" do 
@@ -339,7 +340,7 @@ end
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  like $server_templates.import_servertemplates
+  like $server_templates_utilities.import_servertemplates
 end
 
 ####################
@@ -372,13 +373,13 @@ end
 operation "update_app_code" do
   label "Update Application Code"
   description "Select and install a different repo and branch of code."
-  definition "lamp.install_appcode"
+  definition "lamp_utilities.install_appcode"
 end
 
 operation "scale_out" do
   label "Scale Out"
   description "Adds (scales out) an application tier server."
-  definition "server_array.scale_out_array"
+  definition "server_array_utilities.scale_out_array"
   output_mappings do {
     $hourly_app_cost => $app_cost
   } end
@@ -387,7 +388,7 @@ end
 operation "scale_in" do
   label "Scale In"
   description "Scales in an application tier server."
-  definition "server_array.scale_in_array"
+  definition "server_array_utilities.scale_in_array"
   output_mappings do {
     $hourly_app_cost => $app_cost
   } end
@@ -403,7 +404,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   # Use the pricing API to get some numbers
   call find_cloud_costs($map_cloud, $param_cpu, $param_ram) retrieve $cloud_costs_hash
   
-  call err.log("cloud costs hash", to_s($cloud_costs_hash))
+  call err_utilities.log("cloud costs hash", to_s($cloud_costs_hash))
   
   # Build the cloud cost outputs
   $aws_cloud = $cloud_costs_hash["Amazon Web Services"]["cloud_name"]
@@ -438,12 +439,12 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
     end
   end
   
-  call err.log(join(["Selected Cloud: ", $cheapest_cloud, "; Cloud Href: ",$cheapest_cloud_href]), "")
+  call err_utilities.log(join(["Selected Cloud: ", $cheapest_cloud, "; Cloud Href: ",$cheapest_cloud_href]), "")
   
   # Store the hourly cost for future reference
   rs_cm.tags.multi_add(resource_hrefs: [@@deployment.href], tags: [join(["lamp_stack:instancecost=",$cheapest_cost])])
 
-  call err.log(join(["cheapest cloud: ",$cheapest_cloud]), "")
+  call err_utilities.log(join(["cheapest cloud: ",$cheapest_cloud]), "")
 
   foreach $cloud in keys($map_cloud) do
     if $cheapest_cloud == map($map_cloud, $cloud, "cloud_provider")
@@ -451,7 +452,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
     end
   end
       
-  call err.log(join(["param_location: ",$param_location]), "")
+  call err_utilities.log(join(["param_location: ",$param_location]), "")
     
   # Finish configuring the resource declarations so they are ready for launch
     
@@ -529,7 +530,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   # But we need to work around a couple of things. First of all the security groups and stuff are already provisioned, so we pass "false" for the parameters that would cause launch_servers() to try and (re)provision them.
   # And similarly, we retrieve fake values for these resources so we don't mess up the originals.
   # We also don't have the standard conditions around $inAzure and $inVMware so we evaluate things and pass those results.
-  call lamp.launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, equals?($param_location,"Azure"), equals?($param_location,"VMware"), false, false, false)  retrieve @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
+  call lamp_utilities.launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, equals?($param_location,"Azure"), equals?($param_location,"VMware"), false, false, false)  retrieve @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
 
   call calc_app_cost(@app_server) retrieve $app_cost
   
@@ -571,12 +572,15 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
     $cloud_href_filter = $cloud_href_filter + $cloud_href_array
   end
   
-  call err.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
+  call err_utilities.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
 
    # Build an array of cpu counts for the pricing API filter
-   $numcpu = to_n($param_cpu)
-   $maxcpu = $numcpu + 1 # try one cpu bigger as well in the search.
-   $cpu_count_array = [$numcpu, $maxcpu]
+   # If the 1 CPU option was selected, also look at 2 CPUs since pricing can be a bit mushy in that range and a 2 CPU 
+   # instance type in some clouds may be chepaer than a 1 CPU option in other clouds.
+   $cpu_count_array = [ $cpu_count ]
+   if $cpu_count == 1
+     $cpu_count_array = $cpu_count_array + [ 2 ]
+   end
 
    # pricing filters
    $filter = {
@@ -590,7 +594,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      platform_version: [null]  # This finds vanilla "free" linux instance types - avoiding for-fee variants like Redhat or Suse
     }
       
-   call err.log(join(["pricing filter: "]), to_s($filter))
+   call err_utilities.log(join(["pricing filter: "]), to_s($filter))
            
    # Get an array of price hashes for the given filters
    $response = http_request(
@@ -606,7 +610,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
    
    $price_hash_array = $response["body"]
      
-   call err.log(join(["price_hash_array size: ", size($price_hash_array)]), "")
+   call err_utilities.log(join(["price_hash_array size: ", size($price_hash_array)]), "")
      
    # Now we need to find the best pricing info for the vanilla Linux/Unix platform
    # with the minimum cpu and ram for the given cloud
@@ -633,7 +637,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      end
    end
          
-#     call err,log(join(["found vendor: ", $found_cloud_vendor]), "")
+#     call err_utilities,log(join(["found vendor: ", $found_cloud_vendor]), "")
 
      
      # We are ok with any Google or Azure type.
@@ -641,7 +645,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      # Also the Google price_hash does not have a local_disk_size attribute so we can't just look at that.
      # Hence a multidimensional condition test
      if logic_or(logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), $found_cloud_vendor == "VMware"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
-#       call err.log(join(["found a valid price_hash for ", $found_cloud_vendor]), to_s($price_hash))
+#       call err_utilities.log(join(["found a valid price_hash for ", $found_cloud_vendor]), to_s($price_hash))
 
        $purchase_options = keys($price_hash["purchase_option"])
          
@@ -655,7 +659,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
            $price = ""
            foreach $usage_charge in $price_hash["usage_charges"] do
               $price = $usage_charge["price"]
-#              call err.log(join(["Found price for ", $found_cloud_vendor, "; price: ", $price]), to_s($price_hash))
+#              call err_utilities.log(join(["Found price for ", $found_cloud_vendor, "; price: ", $price]), to_s($price_hash))
            end
            
            # Is it cheapest so far?
@@ -735,14 +739,14 @@ define checkInstanceType($cloud_href, $instance_type, $supported_instance_types_
     $instance_type_names=@instance_types.name[]
     $supported_instance_types_hash[$cloud_href] = $instance_type_names
     
-#    call err.log(join(["Gathered instance types for cloud, ", $cloud_href]), to_s($instance_type_names))
+#    call err_utilities.log(join(["Gathered instance types for cloud, ", $cloud_href]), to_s($instance_type_names))
   end
   
   # Check if the instance type found in the pricing API is a supported instance type
   $usableInstanceType = contains?($supported_instance_types_hash[$cloud_href], [$instance_type])
   
 #  if logic_not($usableInstanceType)
-#    call err.log(join(["Found unsupported instance type, ", to_s($instance_type), " in cloud, ", to_s($cloud_href)]), "")
+#    call err_utilities.log(join(["Found unsupported instance type, ", to_s($instance_type), " in cloud, ", to_s($cloud_href)]), "")
 #  end
 end
 

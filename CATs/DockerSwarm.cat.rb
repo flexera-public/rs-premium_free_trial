@@ -38,20 +38,20 @@ Clouds Supported: <B>AWS, Google</B>"
 # Imports        #
 ##################
 
-import "util/server_templates"
-import "util/err"
-import "util/cloud"
-import "common/mappings", as: 'common_mappings'
-import "common/parameters"
-import "common/resources"
-import "common/conditions"
+import "pft/server_templates_utilities"
+import "pft/err_utilities"
+import "pft/cloud_utilities"
+import "pft/mappings", as: 'common_mappings'
+import "pft/parameters"
+import "pft/resources"
+import "pft/conditions"
 
 
 ##################
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  like $server_templates.import_servertemplates
+  like $server_templates_utilities.import_servertemplates
 end
 
 ##################
@@ -310,10 +310,10 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call cloud.checkCloudSupport($cloud_name, $param_location)
+  call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call server_templates.importServerTemplate($map_st)
+  call server_templates_utilities.importServerTemplate($map_st)
     
   # Provision all the needed resources
   
@@ -350,7 +350,7 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
   end
   
   # Now we re-run the manager script so the swarm manager will discover the swarm nodes.
-  call server_templates.run_script_no_inputs(@swarm_manager, "APP docker swarm manage")
+  call server_templates_utilities.run_script_no_inputs(@swarm_manager, "APP docker swarm manage")
   
   # Now tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]

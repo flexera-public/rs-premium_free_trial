@@ -30,12 +30,12 @@ long_description "Launches a Linux server, defaults to Ubuntu.\n
 \n
 Clouds Supported: <B>AWS, Azure, Google, VMware</B>"
 
-import "common/parameters"
-import "common/mappings"
-import "common/resources", as: "common_resources"
-import "common/conditions"
-import "util/server_templates"
-import "util/cloud"
+import "pft/parameters"
+import "pft/mappings"
+import "pft/resources", as: "common_resources"
+import "pft/conditions"
+import "pft/server_templates_utilities"
+import "pft/cloud_utilities"
 
 ##################
 # User inputs    #
@@ -170,7 +170,7 @@ end
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  like $server_templates.import_servertemplates
+  like $server_templates_utilities.import_servertemplates
 end
 
 ##################
@@ -231,10 +231,10 @@ define pre_auto_launch($map_cloud, $param_location, $invSphere, $map_st) do
     # Check if the selected cloud is supported in this account.
     # Since different PIB scenarios include different clouds, this check is needed.
     # It raises an error if not which stops execution at that point.
-    call cloud.checkCloudSupport($cloud_name, $param_location)
+    call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
     
     # Find and import the server template - just in case it hasn't been imported to the account already
-    call server_templates.importServerTemplate($map_st)
+    call server_templates_utilities.importServerTemplate($map_st)
 
 end
 

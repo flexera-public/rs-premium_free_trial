@@ -3,7 +3,7 @@ name 'LIB - Credential utilities'
 rs_ca_ver 20160622
 short_description "Credential related utilities"
 
-package "util/creds"
+package "pft/creds_utilities"
 
 # Creates CREDENTIAL objects in Cloud Management for each of the named items in the given array.
 define createCreds($credname_array) do

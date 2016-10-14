@@ -2,10 +2,12 @@ name "LIB - LAMP Definitions"
 rs_ca_ver 20160622
 short_description "RCL definitions used for launching a LAMP stack."
 
-package "definitions/lamp"
+package "pft/lamp_utilities"
 
-import "util/server_templates"
-import "common/lamp_resources"
+import "pft/server_templates_utilities"
+import "pft/cloud_utilities"
+import "pft/creds_utilities"
+import "pft/lamp_resources"
 
 
 define launcher(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do 
@@ -16,12 +18,12 @@ define launcher(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call cloud.checkCloudSupport($cloud_name, $param_location)
+  call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call server_templates.importServerTemplate($map_st)
+  call server_templates_utilities.importServerTemplate($map_st)
   
-  call creds.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
+  call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
     
   call launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  retrieve @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link 
 
@@ -80,25 +82,25 @@ define launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_grou
   
   concurrent do  
     # Enable monitoring for server-specific application software
-    call server_templates.run_recipe_no_inputs(@lb_server, "rs-haproxy::collectd")
-    call server_templates.run_recipe_no_inputs(@app_server, "rs-application_php::collectd")  
-    call server_templates.run_recipe_no_inputs(@db_server, "rs-mysql::collectd")   
+    call server_templates_utilities.run_recipe_no_inputs(@lb_server, "rs-haproxy::collectd")
+    call server_templates_utilities.run_recipe_no_inputs(@app_server, "rs-application_php::collectd")  
+    call server_templates_utilities.run_recipe_no_inputs(@db_server, "rs-mysql::collectd")   
     
     # Import a test database
-    call server_templates.run_recipe_no_inputs(@db_server, "rs-mysql::dump_import")  # applicable inputs were set at launch
+    call server_templates_utilities.run_recipe_no_inputs(@db_server, "rs-mysql::dump_import")  # applicable inputs were set at launch
     
     # Set up the tags for the load balancer and app servers to find each other.
-    call server_templates.run_recipe_no_inputs(@lb_server, "rs-haproxy::tags")
-    call server_templates.run_recipe_no_inputs(@app_server, "rs-application_php::tags")  
+    call server_templates_utilities.run_recipe_no_inputs(@lb_server, "rs-haproxy::tags")
+    call server_templates_utilities.run_recipe_no_inputs(@app_server, "rs-application_php::tags")  
     
     # Due to the concurrent launch above, it's possible the app server came up before the DB server and wasn't able to connect.
     # So, we re-run the application setup script to force it to connect.
-    call server_templates.run_recipe_no_inputs(@app_server, "rs-application_php::default")
+    call server_templates_utilities.run_recipe_no_inputs(@app_server, "rs-application_php::default")
   end
     
   # Now that all the servers are good to go, tell the LB to find the app server.
   # This must run after the tagging is complete, so it is done outside the concurrent block above.
-  call server_templates.run_recipe_no_inputs(@lb_server, "rs-haproxy::frontend")
+  call server_templates_utilities.run_recipe_no_inputs(@lb_server, "rs-haproxy::frontend")
     
   # Now tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
@@ -149,5 +151,5 @@ define install_appcode($param_appcode, @app_server) do
   @app_server.current_instances().multi_update_inputs(inputs: $inp)
 
   # Call the operational recipe to apply the new code
-  call server_templates.run_recipe_no_inputs(@app_server, "rs-application_php::default")
+  call server_templates_utilities.run_recipe_no_inputs(@app_server, "rs-application_php::default")
 end

@@ -2,7 +2,7 @@ name "LIB - Common LAMP parameters"
 rs_ca_ver 20160622
 short_description "Parameters that are commonly used in LAMP CATs"
 
-package "common/lamp_parameters"
+package "pft/lamp_parameters"
 
 parameter "param_appcode" do 
   category "Application Code"

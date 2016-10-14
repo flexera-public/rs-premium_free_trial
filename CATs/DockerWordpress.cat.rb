@@ -41,14 +41,14 @@ long_description "Launch a Docker server and run WordPress and Database containe
 \n
 Clouds Supported: <B>AWS, Azure, Google, VMware</B>"
 
-import "common/parameters"
-import "common/outputs"
-import "common/conditions"
-import "common/mappings"
-import "common/resources"
-import "util/server_templates"
-import "util/err"
-import "util/cloud"
+import "pft/parameters"
+import "pft/outputs"
+import "pft/conditions"
+import "pft/mappings"
+import "pft/resources"
+import "pft/server_templates_utilities"
+import "pft/err_utilities"
+import "pft/cloud_utilities"
 
 
 ##################
@@ -173,7 +173,7 @@ end
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  like $server_templates.import_servertemplates
+  like $server_templates_utilities.import_servertemplates
 end
 
 ##################
@@ -231,10 +231,10 @@ define pre_auto_launch($map_cloud, $param_location, $map_st) do
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call cloud.checkCloudSupport($cloud_name, $param_location)
+  call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
     
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call server_templates.importServerTemplate($map_st)
+  call server_templates_utilities.importServerTemplate($map_st)
 
 end
     
@@ -279,7 +279,7 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $w
   
   # For some reason in Azure, the docker containers - esp wordpress - don't get started as expected.
   # Although this has only been seen in Azure we'll force a start in all clouds - just to be safe.
-  call server_templates.run_script_no_inputs(@docker_server, "APP docker services up")
+  call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services up")
 
 end
 

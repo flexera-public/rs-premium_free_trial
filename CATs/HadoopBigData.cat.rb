@@ -31,13 +31,13 @@ long_description "Launch a Hadoop cluster with a data node cluster of up to 4 se
 Clouds Supported: <B>AWS, Azure</B>"
 
 ### IMPORTS ###
-import "common/parameters"
-import "common/mappings", as: 'common_mappings'
-import "common/conditions"
-import "common/resources"
-import "util/server_templates"
-import "util/err"
-import "util/cloud"
+import "pft/parameters"
+import "pft/mappings", as: 'common_mappings'
+import "pft/conditions"
+import "pft/resources"
+import "pft/server_templates_utilities"
+import "pft/err_utilities"
+import "pft/cloud_utilities"
 
 ### USER INPUTS ###
 parameter "param_location" do
@@ -319,7 +319,7 @@ end
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  like $server_templates.import_servertemplates
+  like $server_templates_utilities.import_servertemplates
 end
 
 ####################
@@ -345,10 +345,10 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call cloud.checkCloudSupport($cloud_name, $param_location)
+  call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call server_templates.importServerTemplate($map_st)
+  call server_templates_utilities.importServerTemplate($map_st)
      
   # Create the Hadoop SSH bits if needed
   call manageHadoopSshKeys()
@@ -413,7 +413,7 @@ define launch_servers(@namenode, @datanode_cluster, @sec_group, @sgrule_ssh, @sg
   
   # Now we re-run the attach script so the namenode will find the datanode.
   # This is done in case the datanode actually came up before the namenode due to the concurrency used above.
-  call server_templates.run_recipe_no_inputs(@namenode, "hadoop::handle_attach")  
+  call server_templates_utilities.run_recipe_no_inputs(@namenode, "hadoop::handle_attach")  
     
   # Now tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
