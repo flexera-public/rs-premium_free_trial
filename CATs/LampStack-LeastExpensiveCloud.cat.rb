@@ -1,5 +1,5 @@
 #Copyright 2015 RightScale
-#
+#x
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
@@ -24,7 +24,7 @@
 
 
 name 'D) App Stack - Least Expensive Cloud'
-rs_ca_ver 20131202
+rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/best_price_new.png)
 
 Launches a scalable LAMP stack that supports application code updates in least expensive PUBLIC or PRIVATE cloud based on user-specified CPU and RAM."
@@ -32,23 +32,26 @@ long_description "Launches a 3-tier LAMP stack in the least expensive environmen
 Clouds Supported: <B>AWS, Azure, Google, VMware</B>\n
 Pro Tip: Select CPU=1 and RAM=1 to end up in the VMware environment."
 
+import "pft/parameters"
+import "pft/lamp_mappings"
+import "pft/resources"
+import "pft/lamp_resources"
+import "pft/server_templates_utilities"
+import "pft/server_array_utilities"
+import "pft/err_utilities"
+import "pft/creds_utilities"
+import "pft/lamp_utilities"
+
 ##################
 # User inputs    #
 ##################
-#parameter "param_location" do 
-#  category "Deployment Options"
-#  label "Cloud" 
-#  type "string" 
-#  allowed_values "AWS", "Azure", "Google", "VMware" 
-#  default "AWS"
-#end
-
 parameter "param_cpu" do 
   category "User Inputs"
   label "Minimum Number of vCPUs" 
-  type "string" 
+  type "number" 
   description "Minimum number of vCPUs needed for the application." 
-  default "2"
+  allowed_values 1, 2, 4, 8
+  default 2
 end
 
 parameter "param_ram" do 
@@ -59,12 +62,8 @@ parameter "param_ram" do
   default "2"
 end
 
-parameter "param_costcenter" do 
-  category "User Inputs"
-  label "Cost Center" 
-  type "string" 
-  allowed_values "Development", "QA", "Production"
-  default "Development"
+parameter "param_costcenter" do
+  like $parameters.param_costcenter
 end
 
 parameter "param_appcode" do 
@@ -73,7 +72,7 @@ parameter "param_appcode" do
   type "string" 
   allowed_values "(Yellow) github.com/rightscale/examples:unified_php", "(Blue) github.com/rs-services/rs-premium_free_trial:unified_php_modified" 
   default "(Blue) github.com/rs-services/rs-premium_free_trial:unified_php_modified"
-  operations "Update Application Code"
+  operations "update_app_code"
 end
 
 ################################
@@ -241,45 +240,26 @@ mapping "map_cloud" do {
 end
 
 # Mapping of which ServerTemplates and Revisions to use for each tier.
-mapping "map_st" do {
-  "lb" => {
-    "name" => "Load Balancer with HAProxy (v14.1.1)",
-    "rev" => "43",
-  },
-  "app" => {
-    "name" => "PHP App Server (v14.1.1)",
-    "rev" => "44",
-  },
-  "db" => {
-    "name" => "Database Manager for MySQL (v14.1.1)",
-    "rev" => "56",
-  }
-} end
+mapping "map_st" do   
+  like $lamp_mappings.map_st
+end
 
-mapping "map_mci" do {
-  "VMware" => { # vSphere 
-    "mci_name" => "RightImage_CentOS_6.6_x64_v14.2_VMware",
-    "mci_rev" => "9",
-  },
-  "Public" => { # all other clouds
-    "mci_name" => "RightImage_CentOS_6.6_x64_v14.2",
-    "mci_rev" => "24",
-  }
-} end
+mapping "map_mci" do 
+  like $lamp_mappings.map_mci
+end
 
 # Mapping of names of the creds to use for the DB-related credential items.
 # Allows for easier maintenance down the road if needed.
-mapping "map_db_creds" do {
-  "root_password" => {
-    "name" => "CAT_MYSQL_ROOT_PASSWORD",
-  },
-  "app_username" => {
-    "name" => "CAT_MYSQL_APP_USERNAME",
-  },
-  "app_password" => {
-    "name" => "CAT_MYSQL_APP_PASSWORD",
+mapping "map_db_creds" do
+  like $lamp_mappings.map_db_creds
+end
+
+mapping "map_nulls" do {
+  "place_holder" => {
+    "null_value" => null
   }
 } end
+  
 
 
 ############################
@@ -288,203 +268,79 @@ mapping "map_db_creds" do {
 
 ### Server Declarations ###
 resource 'lb_server', type: 'server' do
-  name 'Load Balancer'
-#  cloud map( $map_cloud, $param_location, "cloud" )
-#  datacenter map($map_cloud, $param_location, "zone")
-#  instance_type map($map_cloud, $param_location, "instance_type")
-#  ssh_key_href map($map_cloud, $param_location, "ssh_key")
-#  placement_group_href map($map_cloud, $param_location, "pg")
-#  security_group_hrefs map($map_cloud, $param_location, "sg") 
-  server_template find(map($map_st, "lb", "name"), revision: map($map_st, "lb", "rev"))
-#  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
-  inputs do {
-    'ephemeral_lvm/logical_volume_name' => 'text:ephemeral0',
-    'ephemeral_lvm/logical_volume_size' => 'text:100%VG',
-    'ephemeral_lvm/mount_point' => 'text:/mnt/ephemeral',
-    'ephemeral_lvm/stripe_size' => 'text:512',
-    'ephemeral_lvm/volume_group_name' => 'text:vg-data',
-    'rs-base/ntp/servers' => 'array:["text:time.rightscale.com","text:ec2-us-east.time.rightscale.com","text:ec2-us-west.time.rightscale.com"]',
-    'rs-base/swap/size' => 'text:1',
-    'rs-haproxy/balance_algorithm' => 'text:roundrobin',
-    'rs-haproxy/health_check_uri' => 'text:/',
-    'rs-haproxy/incoming_port' => 'text:80',
-    'rs-haproxy/pools' => 'array:["text:default"]',
-    'rs-haproxy/schedule/enable' => 'text:true',
-    'rs-haproxy/schedule/interval' => 'text:15',
-    'rs-haproxy/session_stickiness' => 'text:false',
-    'rs-haproxy/stats_uri' => 'text:/haproxy-status',
-    "rightscale/security_updates" => "text:enable", # Enable security updates
-  } end
+  like @lamp_resources.lb_server
+  # The following attributes are configured in RCL below once we know which cloud we are using.
+  # So we overwrite some placeholder values for now.
+  cloud map($map_nulls, "place_holder", "null_value")
+  datacenter map($map_nulls, "place_holder", "null_value")
+  instance_type map($map_nulls, "place_holder", "null_value")
+  ssh_key_href map($map_nulls, "place_holder", "null_value")
+  placement_group_href map($map_nulls, "place_holder", "null_value")
+  security_group_hrefs map($map_nulls, "place_holder", "null_value")
+  multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
 end
 
 resource 'db_server', type: 'server' do
-  like @lb_server
-
-  name 'Database Server'
-  server_template find(map($map_st, "db", "name"), revision: map($map_st, "db", "rev"))
-  inputs do {
-    'ephemeral_lvm/logical_volume_name' => 'text:ephemeral0',
-    'ephemeral_lvm/logical_volume_size' => 'text:100%VG',
-    'ephemeral_lvm/mount_point' => 'text:/mnt/ephemeral',
-    'ephemeral_lvm/stripe_size' => 'text:512',
-    'ephemeral_lvm/volume_group_name' => 'text:vg-data',
-    'rs-base/ntp/servers' => 'array:["text:time.rightscale.com","text:ec2-us-east.time.rightscale.com","text:ec2-us-west.time.rightscale.com"]',
-    'rs-base/swap/size' => 'text:1',
-    'rs-mysql/application_user_privileges' => 'array:["text:select","text:update","text:insert"]',
-    'rs-mysql/backup/keep/dailies' => 'text:14',
-    'rs-mysql/backup/keep/keep_last' => 'text:60',
-    'rs-mysql/backup/keep/monthlies' => 'text:12',
-    'rs-mysql/backup/keep/weeklies' => 'text:6',
-    'rs-mysql/backup/keep/yearlies' => 'text:2',
-    'rs-mysql/bind_network_interface' => 'text:private',
-    'rs-mysql/device/count' => 'text:2',
-    'rs-mysql/device/destroy_on_decommission' => 'text:false',
-    'rs-mysql/device/detach_timeout' => 'text:300',
-    'rs-mysql/device/mount_point' => 'text:/mnt/storage',
-    'rs-mysql/device/nickname' => 'text:data_storage',
-    'rs-mysql/device/volume_size' => 'text:10',
-    'rs-mysql/schedule/enable' => 'text:false',
-    'rs-mysql/server_usage' => 'text:dedicated',
-    'rs-mysql/backup/lineage' => 'text:demolineage',
-    'rs-mysql/server_root_password' => "cred:CAT_MYSQL_ROOT_PASSWORD",
-    'rs-mysql/application_password' => "cred:CAT_MYSQL_APP_PASSWORD",
-    'rs-mysql/application_username' => "cred:CAT_MYSQL_APP_USERNAME",
-    'rs-mysql/application_database_name' => 'text:app_test',
-    'rs-mysql/import/dump_file' => 'text:app_test.sql',
-    'rs-mysql/import/repository' => 'text:git://github.com/rightscale/examples.git',
-    'rs-mysql/import/revision' => 'text:unified_php',
-  } end
+  like @lamp_resources.db_server
+  # The following attributes are configured in RCL below once we know which cloud we are using.
+  # So we overwrite some placeholder values for now.
+  cloud map($map_nulls, "place_holder", "null_value")
+  datacenter map($map_nulls, "place_holder", "null_value")
+  instance_type map($map_nulls, "place_holder", "null_value")
+  ssh_key_href map($map_nulls, "place_holder", "null_value")
+  placement_group_href map($map_nulls, "place_holder", "null_value")
+  security_group_hrefs map($map_nulls, "place_holder", "null_value")
+  multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
 end
 
 resource 'app_server', type: 'server_array' do
-  name 'App Server'
-#  cloud map( $map_cloud, $param_location, "cloud" )
-#  datacenter map($map_cloud, $param_location, "zone")
-#  instance_type map($map_cloud, $param_location, "instance_type")
-#  ssh_key_href map($map_cloud, $param_location, "ssh_key")
-#  placement_group_href map($map_cloud, $param_location, "pg")
-#  security_group_hrefs map($map_cloud, $param_location, "sg") 
-#  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
-  server_template find(map($map_st, "app", "name"), revision: map($map_st, "app", "rev"))
-  inputs do {
-    'ephemeral_lvm/logical_volume_name' => 'text:ephemeral0',
-    'ephemeral_lvm/logical_volume_size' => 'text:100%VG',
-    'ephemeral_lvm/mount_point' => 'text:/mnt/ephemeral',
-    'ephemeral_lvm/stripe_size' => 'text:512',
-    'ephemeral_lvm/volume_group_name' => 'text:vg-data',
-    'rs-application_php/app_root' => 'text:/',
-    'rs-application_php/application_name' => 'text:default',
-    'rs-application_php/bind_network_interface' => 'text:private',
-    'rs-application_php/database/host' => 'env:Database Server:PRIVATE_IP',
-    'rs-application_php/database/password' => 'cred:CAT_MYSQL_APP_PASSWORD',
-    'rs-application_php/database/schema' => 'text:app_test',
-    'rs-application_php/database/user' => 'cred:CAT_MYSQL_APP_USERNAME',
-    'rs-application_php/listen_port' => 'text:8080',
-    'rs-application_php/scm/repository' => 'text:git://github.com/rightscale/examples.git',
-    'rs-application_php/scm/revision' => 'text:unified_php',
-    'rs-application_php/vhost_path' => 'text:/dbread',
-    'rs-base/ntp/servers' => 'array:["text:time.rightscale.com","text:ec2-us-east.time.rightscale.com","text:ec2-us-west.time.rightscale.com"]',
-    'rs-base/swap/size' => 'text:1',
-  } end
-  # Server Array Settings
-  state "enabled"
-  array_type "alert"
-  elasticity_params do {
-    "bounds" => {
-      "min_count"            => 1,
-      "max_count"            => 5 # Limited to 5 to avoid deploying too many servers.
-    },
-    "pacing" => {
-      "resize_calm_time"     => 5, 
-      "resize_down_by"       => 1,
-      "resize_up_by"         => 1
-    },
-    "alert_specific_params" => {
-      "decision_threshold"   => 51,
-      "voters_tag_predicate" => "App Server"
-    }
-  } end
+  like @lamp_resources.app_server
+  # The following attributes are configured in RCL below once we know which cloud we are using.
+  # So we overwrite some placeholder values for now.
+  cloud map($map_nulls, "place_holder", "null_value")
+  datacenter map($map_nulls, "place_holder", "null_value")
+  instance_type map($map_nulls, "place_holder", "null_value")
+  ssh_key_href map($map_nulls, "place_holder", "null_value")
+  placement_group_href map($map_nulls, "place_holder", "null_value")
+  security_group_hrefs map($map_nulls, "place_holder", "null_value")
+  multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
 end
 
 ## TO-DO: Set up separate security groups for each tier with rules that allow the applicable port(s) only from the IP of the given tier server(s)
 resource "sec_group", type: "security_group" do
-#  condition $needsSecurityGroup
-
-  name join(["sec_group-",@@deployment.href])
-  description "CAT security group."
-#  cloud map( $map_cloud, $param_location, "cloud" )
+  like @lamp_resources.sec_group
+  cloud map($map_nulls, "place_holder", "null_value") # placeholder until we know which cloud
 end
 
 resource "sec_group_rule_http", type: "security_group_rule" do
-#  condition $needsSecurityGroup
-  
-  name "CAT HTTP Rule"
-  description "Allow HTTP access."
-  source_type "cidr_ips"
-  security_group @sec_group
-  protocol "tcp"
-  direction "ingress"
-  cidr_ips "0.0.0.0/0"
-  protocol_details do {
-    "start_port" => "80",
-    "end_port" => "80"
-  } end
+  like @lamp_resources.sec_group_rule_http
 end
 
 resource "sec_group_rule_http8080", type: "security_group_rule" do
-#  condition $needsSecurityGroup
-  
-  name "CAT HTTP Rule"
-  description "Allow HTTP port 8080 access."
-  source_type "cidr_ips"
-  security_group @sec_group
-  protocol "tcp"
-  direction "ingress"
-  cidr_ips "0.0.0.0/0"
-  protocol_details do {
-    "start_port" => "8080",
-    "end_port" => "8080"
-  } end
+  like @lamp_resources.sec_group_rule_http8080
 end
 
 resource "sec_group_rule_mysql", type: "security_group_rule" do
-#  condition $needsSecurityGroup
-  
-  name "CAT MySQL Rule"
-  description "Allow MySQL access over standard port."
-  source_type "cidr_ips"
-  security_group @sec_group
-  protocol "tcp"
-  direction "ingress"
-  cidr_ips "0.0.0.0/0"
-  protocol_details do {
-    "start_port" => "3306",
-    "end_port" => "3306"
-  } end
+  like @lamp_resources.sec_group_rule_mysql
 end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
-#  condition $needsSshKey
-
-  name join(["sshkey_", last(split(@@deployment.href,"/"))])
-#  cloud map($map_cloud, $param_location, "cloud")
+  like @resources.ssh_key
+  cloud map($map_nulls, "place_holder", "null_value") # placeholder until we know which cloud
 end
 
 ### Placement Group ###
 resource "placement_group", type: "placement_group" do
-#  condition $needsPlacementGroup
-
-  name last(split(@@deployment.href,"/"))
-#  cloud map($map_cloud, $param_location, "cloud")
+  like @resources.placement_group
+  cloud map($map_nulls, "place_holder", "null_value") # placeholder until we know which cloud
 end 
 
 ##################
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  actions   "rs.import"
-  resources "rs.publications"
+  like $server_templates_utilities.import_servertemplates
 end
 
 ####################
@@ -514,22 +370,25 @@ operation "launch" do
   } end
 end
 
-operation "Update Application Code" do
+operation "update_app_code" do
+  label "Update Application Code"
   description "Select and install a different repo and branch of code."
-  definition "install_appcode"
+  definition "lamp_utilities.install_appcode"
 end
 
-operation "Scale Out" do
+operation "scale_out" do
+  label "Scale Out"
   description "Adds (scales out) an application tier server."
-  definition "scale_out_array"
+  definition "server_array_utilities.scale_out_array"
   output_mappings do {
     $hourly_app_cost => $app_cost
   } end
 end
 
-operation "Scale In" do
+operation "scale_in" do
+  label "Scale In"
   description "Scales in an application tier server."
-  definition "scale_in_array"
+  definition "server_array_utilities.scale_in_array"
   output_mappings do {
     $hourly_app_cost => $app_cost
   } end
@@ -540,15 +399,12 @@ end
 ##########################
 define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram, $param_costcenter)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
 
-  # Find and import the server template - just in case it hasn't been imported to the account already
-  call importServerTemplate($map_st)
-  
   # Calculate where to launch the system
 
   # Use the pricing API to get some numbers
   call find_cloud_costs($map_cloud, $param_cpu, $param_ram) retrieve $cloud_costs_hash
   
-  call audit_log("cloud costs hash", to_s($cloud_costs_hash))
+  call err_utilities.log("cloud costs hash", to_s($cloud_costs_hash))
   
   # Build the cloud cost outputs
   $aws_cloud = $cloud_costs_hash["Amazon Web Services"]["cloud_name"]
@@ -583,12 +439,12 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
     end
   end
   
-  call audit_log(join(["Selected Cloud: ", $cheapest_cloud, "; Cloud Href: ",$cheapest_cloud_href]), "")
+  call err_utilities.log(join(["Selected Cloud: ", $cheapest_cloud, "; Cloud Href: ",$cheapest_cloud_href]), "")
   
   # Store the hourly cost for future reference
-  rs.tags.multi_add(resource_hrefs: [@@deployment.href], tags: [join(["lamp_stack:instancecost=",$cheapest_cost])])
+  rs_cm.tags.multi_add(resource_hrefs: [@@deployment.href], tags: [join(["lamp_stack:instancecost=",$cheapest_cost])])
 
-  call audit_log(join(["cheapest cloud: ",$cheapest_cloud]), "")
+  call err_utilities.log(join(["cheapest cloud: ",$cheapest_cloud]), "")
 
   foreach $cloud in keys($map_cloud) do
     if $cheapest_cloud == map($map_cloud, $cloud, "cloud_provider")
@@ -596,25 +452,24 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
     end
   end
       
-  call audit_log(join(["param_location: ",$param_location]), "")
+  call err_utilities.log(join(["param_location: ",$param_location]), "")
     
-  # Provision the resources
-
-  # Create credentials used to access the MySQL database as part of the CAT to make it more portable.
-  call createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
+  # Finish configuring the resource declarations so they are ready for launch
     
   # find the MCI to use based on which cloud was selected.
   @multi_cloud_image = find("multi_cloud_images", map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
   $multi_cloud_image_href = @multi_cloud_image.href
-    
+      
   # modify resources with the cheapest cloud
   $resource_hash = to_object(@ssh_key)
+
   $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
+
   @ssh_key = $resource_hash
   
   $resource_hash = to_object(@sec_group)
   $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  @sec_group = $resource_hash   
+  @sec_group = $resource_hash  
   
   $resource_hash = to_object(@placement_group)
   $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
@@ -633,7 +488,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   $db_hash = to_object(@db_server)
   $db_hash["fields"]["cloud_href"] = $cheapest_cloud_href
   $db_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
-  $db_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href      
+  $db_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href     
     
   if map($map_cloud, $param_location, "zone")   
     $lb_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
@@ -668,257 +523,19 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   @app_server = $webtier_hash
   @db_server = $db_hash
   
-  # Launch the servers concurrently
-  concurrent return  @lb_server, @app_server, @db_server do 
-    sub task_name:"Launch DB" do
-      task_label("Launching DB")
-      $db_retries = 0 
-      sub on_error: handle_retries($db_retries) do
-        $db_retries = $db_retries + 1
-        provision(@db_server)
-      end
-    end
-    sub task_name:"Launch LB" do
-      task_label("Launching LB")
-      $lb_retries = 0 
-      sub on_error: handle_retries($lb_retries) do
-        $lb_retries = $lb_retries + 1
-        provision(@lb_server)
-      end
-    end
-    
-    sub task_name:"Launch Application Tier" do
-      task_label("Launching Application Tier")
-      $apptier_retries = 0 
-      sub on_error: handle_retries($apptier_retries) do
-        $apptier_retries = $apptier_retries + 1
-        provision(@app_server)
-      end
-    end
-  end
   
-  concurrent do  
-    # Enable monitoring for server-specific application software
-    call run_recipe_inputs(@lb_server, "rs-haproxy::collectd", {})
-    call run_recipe_inputs(@app_server, "rs-application_php::collectd", {})  
-    call run_recipe_inputs(@db_server, "rs-mysql::collectd", {})   
-    
-    # Import a test database
-    call run_recipe_inputs(@db_server, "rs-mysql::dump_import", {})  # applicable inputs were set at launch
-    
-    # Set up the tags for the load balancer and app servers to find each other.
-    call run_recipe_inputs(@lb_server, "rs-haproxy::tags", {})
-    call run_recipe_inputs(@app_server, "rs-application_php::tags", {})  
-    
-    # Due to the concurrent launch above, it's possible the app server came up before the DB server and wasn't able to connect.
-    # So, we re-run the application setup script to force it to connect.
-    call run_recipe_inputs(@app_server, "rs-application_php::default", {})
-  end
-    
-  # Now that all the servers are good to go, tell the LB to find the app server.
-  # This must run after the tagging is complete, so it is done outside the concurrent block above.
-  call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
-    
-  # If deployed in Azure one needs to provide the port mapping that Azure uses.
-  if $param_location == "Azure"
-     @bindings = rs.clouds.get(href: @lb_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @lb_server.current_instance().href])
-     @binding = select(@bindings, {"private_port":80})
-     $server_addr = join([to_s(@lb_server.current_instance().public_ip_addresses[0]), ":", @binding.public_port])
-  else
-    if $param_location == "VMware"  # Use private IP for VMware envs
-        # Wait for the server to get the IP address we're looking for.
-        while equals?(@lb_server.current_instance().private_ip_addresses[0], null) do
-          sleep(10)
-        end
-        $server_addr =  to_s(@lb_server.current_instance().private_ip_addresses[0])
-        $vmware_note_text = "Your CloudApp was deployed in a VMware environment on a private network and so is not directly accessible."
-    else
-        # Wait for the server to get the IP address we're looking for.
-        while equals?(@lb_server.current_instance().public_ip_addresses[0], null) do
-          sleep(10)
-        end
-        $server_addr =  to_s(@lb_server.current_instance().public_ip_addresses[0])
-    end
-  end
-  $site_link = join(["http://", $server_addr, "/dbread"])
-  $lb_status_link = join(["http://", $server_addr, "/haproxy-status"])
-    
+  # At this point we have the server declarations updated with the necessary values from the least expensive cloud search.
+  # We've also already provisioned the security groups and ssh keys, etc if needed.
+  # So now we are ready to provision the servers. To do so we will use the launch_servers definition for the LAMP stack.
+  # But we need to work around a couple of things. First of all the security groups and stuff are already provisioned, so we pass "false" for the parameters that would cause launch_servers() to try and (re)provision them.
+  # And similarly, we retrieve fake values for these resources so we don't mess up the originals.
+  # We also don't have the standard conditions around $inAzure and $inVMware so we evaluate things and pass those results.
+  call lamp_utilities.launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, equals?($param_location,"Azure"), equals?($param_location,"VMware"), false, false, false)  retrieve @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
+
   call calc_app_cost(@app_server) retrieve $app_cost
   
-  # Now tag the servers with the selected project cost center ID.
-  $tags=[join(["costcenter:id=",$param_costcenter])]
-  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
-  rs.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
-
 end 
 
-# Install a new branch of app code to change colors and some text on the webpage.
-define install_appcode($param_appcode, @app_server) do
-  
-  # Parse the parameter for the repo and branch information  
-  $repo_branch = split($param_appcode, " ")[1]
-  $repo = split($repo_branch, ":")[0]
-  $branch = split($repo_branch, ":")[1]
-  
-  # Create an input hash for the give repo and branch and then update the deployment level, server array, and any 
-  # existing server level Inputs with the value.
-  $inp = {
-    "rs-application_php/scm/repository" : join(["text:git://",$repo,".git"]),
-    "rs-application_php/scm/revision" : join(["text:",$branch]) 
-  }
-  
-  @@deployment.multi_update_inputs(inputs: $inp) 
-  @app_server.next_instance().multi_update_inputs(inputs: $inp)
-  @app_server.current_instances().multi_update_inputs(inputs: $inp)
-
-  # Call the operational recipe to apply the new code
-  call run_recipe_inputs(@app_server, "rs-application_php::default", {})
-end
-
-# Scale out (add) server
-define scale_out_array(@app_server, @lb_server) return $app_cost do
-  task_label("Scale out application server.")
-  @task = @app_server.launch(inputs: {})
-
-  $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
-  sleep_until all?(@app_server.current_instances().state[], $wake_condition)
-  if !all?(@app_server.current_instances().state[], "operational")
-    raise "Some instances failed to start"    
-  end
-  
-  # Now execute post launch scripts to finish setting up the server.
-  concurrent do
-    call run_recipe_inputs(@app_server, "rs-application_php::collectd", {})  
-    call run_recipe_inputs(@app_server, "rs-application_php::tags", {})  
-  end
-  
-  # Tell the load balancer to find the new app server
-  call run_recipe_inputs(@lb_server, "rs-haproxy::frontend", {})
-    
-  call calc_app_cost(@app_server) retrieve $app_cost
-
-  call apply_costcenter_tag(@app_server)
-
-end
-
-# Apply the cost center tag to the server array instance(s)
-define apply_costcenter_tag(@server_array) do
-  # Get the tags for the first instance in the array
-  $tags = rs.tags.by_resource(resource_hrefs: [@server_array.current_instances().href[][0]])
-  # Pull out only the tags bit from the response
-  $tags_array = $tags[0][0]['tags']
-
-  # Loop through the tags from the existing instance and look for the costcenter tag
-  $costcenter_tag = ""
-  foreach $tag_item in $tags_array do
-    $tag = $tag_item['name']
-    if $tag =~ /costcenter:id/
-      $costcenter_tag = $tag
-    end
-  end  
-
-  # Now apply the costcenter tag to all the servers in the array - including the one that was just added as part of the scaling operation
-  rs.tags.multi_add(resource_hrefs: @server_array.current_instances().href[], tags: [$costcenter_tag])
-end
-
-# Scale in (remove) server
-define scale_in_array(@app_server) return $app_cost do
-  task_label("Scale in web server array.")
-
-  @terminable_servers = select(@app_server.current_instances(), {"state":"/^(operational|stranded)/"})
-  if size(@terminable_servers) > 0 
-    # Terminate the oldest instance in the array.
-    @server_to_terminate = first(@terminable_servers)
-    # Have it tell the load balancer of it's impending demise
-    call run_recipe_inputs(@server_to_terminate, "rs-application_php::application_backend_detached", {})
-    # Cause that much anticipated demise
-    @server_to_terminate.terminate()
-    # Wait for the server to be no longer of this mortal coil
-    sleep_until(@server_to_terminate.state != "operational" )
-  else
-    rs.audit_entries.create(audit_entry: {auditee_href: @app_server.href, summary: "Scale In: No terminable server currently found in the server array"})
-  end
-  
-  call calc_app_cost(@app_server) retrieve $app_cost
-
-end
-
-####################
-# Helper Functions #
-####################
-# Checks if the account supports the selected cloud
-define checkCloudSupport($cloud_name, $param_location) do
-  # Gather up the list of clouds supported in this account.
-  @clouds = rs.clouds.get()
-  $supportedClouds = @clouds.name[] # an array of the names of the supported clouds
-  
-  # Check if the selected/mapped cloud is in the list and yell if not
-  if logic_not(contains?($supportedClouds, [$cloud_name]))
-    raise "Your trial account does not support the "+$param_location+" cloud. Contact RightScale for more information on how to enable access to that cloud."
-  end
-end
-  
-# Imports the server templates found in the given map.
-# It assumes a "name" and "rev" mapping
-define importServerTemplate($stmap) do
-  foreach $st in keys($stmap) do
-    $server_template_name = map($stmap, $st, "name")
-    $server_template_rev = map($stmap, $st, "rev")
-    @pub_st=rs.publications.index(filter: ["name=="+$server_template_name, "revision=="+$server_template_rev])
-    @pub_st.import()
-  end
-end
-
-# Creates CREDENTIAL objects in Cloud Management for each of the named items in the given array.
-define createCreds($credname_array) do
-  foreach $cred_name in $credname_array do
-    @cred = rs.credentials.get(filter: join(["name==",$cred_name]))
-    if empty?(@cred) 
-      $cred_value = join(split(uuid(), "-"))[0..14] # max of 16 characters for mysql username and we're adding a letter next.
-      $cred_value = "a" + $cred_value # add an alpha to the beginning of the value - just in case.
-      @task=rs.credentials.create({"name":$cred_name, "value": $cred_value})
-    end
-  end
-end
-
-# Helper functions
-define handle_retries($attempts) do
-  if $attempts < 3
-    $_error_behavior = "retry"
-    sleep(60)
-  else
-    $_error_behavior = "skip"
-  end
-end
-
-define run_recipe_inputs(@target, $recipe_name, $recipe_inputs) do
-  $target_type = type(@target)
-  if equals?($target_type, "rs.server_arrays") 
-    
-    @running_servers = select(@target.current_instances(), {"state":"operational"})
-    @tasks = @running_servers.run_executable(recipe_name: $recipe_name, inputs: $recipe_inputs)
-    sleep_until(all?(@tasks.summary[], "/^(completed|failed)/"))
-    if any?(@tasks.summary[], "/^failed/")
-      raise "Failed to run " + $right_script_href + " on one or more instances"
-    end
-    
-  else # server or instance
-    
-    if equals?($target_type, "rs.instances")
-      @exec_target=@target # target is already an instance type so we're good to go
-    else
-      @exec_target=@target.current_instance() # target is a server and so we need to link to the instance
-    end
-    
-    # Run the recipe against the instance
-    @task = @exec_target.run_executable(recipe_name: $recipe_name, inputs: $recipe_inputs)
-    sleep_until(@task.summary =~ "^(completed|failed)")
-    if @task.summary =~ "failed"
-      raise "Failed to run " + $recipe_name
-    end
-    
-  end
-end
 
 # Calculate the cost of using the different clouds found in the $map_cloud mapping
 define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_hash do
@@ -951,16 +568,19 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
 #      $cloud_provider_filter << $cloud_vendor_name
     
     # Build up a list of cloud hrefs for the pricing filter below
-    $cloud_href_array = rs.clouds.get(filter: join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")])).href[]
+    $cloud_href_array = rs_cm.clouds.get(filter: [ join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")]) ]).href[]
     $cloud_href_filter = $cloud_href_filter + $cloud_href_array
   end
   
-  call audit_log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
+  call err_utilities.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
 
    # Build an array of cpu counts for the pricing API filter
-   $numcpu = to_n($param_cpu)
-   $maxcpu = $numcpu + 1 # try one cpu bigger as well in the search.
-   $cpu_count_array = [$numcpu, $maxcpu]
+   # If the 1 CPU option was selected, also look at 2 CPUs since pricing can be a bit mushy in that range and a 2 CPU 
+   # instance type in some clouds may be chepaer than a 1 CPU option in other clouds.
+   $cpu_count_array = [ $cpu_count ]
+   if $cpu_count == 1
+     $cpu_count_array = $cpu_count_array + [ 2 ]
+   end
 
    # pricing filters
    $filter = {
@@ -974,7 +594,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      platform_version: [null]  # This finds vanilla "free" linux instance types - avoiding for-fee variants like Redhat or Suse
     }
       
-   call audit_log(join(["pricing filter: "]), to_s($filter))
+   call err_utilities.log(join(["pricing filter: "]), to_s($filter))
            
    # Get an array of price hashes for the given filters
    $response = http_request(
@@ -990,34 +610,34 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
    
    $price_hash_array = $response["body"]
      
-   call audit_log(join(["price_hash_array size: ", size($price_hash_array)]), "")
+   call err_utilities.log(join(["price_hash_array size: ", size($price_hash_array)]), "")
      
    # Now we need to find the best pricing info for the vanilla Linux/Unix platform
    # with the minimum cpu and ram for the given cloud
    $cloud_best_price = 100000
    foreach $price_hash in $price_hash_array do
      
-     # Need to figure out which cloud vendor we have here
-     if contains?(keys($price_hash["priceable_resource"]), ["public_cloud_vendor_name"])
-        $found_cloud_vendor = $price_hash["priceable_resource"]["public_cloud_vendor_name"]
+   # Need to figure out which cloud vendor we have here
+   if contains?(keys($price_hash["priceable_resource"]), ["public_cloud_vendor_name"])
+      $found_cloud_vendor = $price_hash["priceable_resource"]["public_cloud_vendor_name"]
+   else
+     # get the cloud name and back into the "found_cloud_vendor" value so subsequent logic will work as expected.
+     # this is needed since the API may not always return a public_cloud_vendor_name value
+     $cloud_href = $price_hash["purchase_option"]["cloud_href"]
+     @cloud = rs_cm.get(href: $cloud_href)
+     $cloud_name = @cloud.name
+     if $cloud_name =~ /Azure/
+       $found_cloud_vendor = "Microsoft Azure"
+     elsif $cloud_name =~ /Google/
+       $found_cloud_vendor = "Google"
+     elsif $cloud_name =~ /EC2/
+       $found_cloud_vendor = "Amazon Web Services"
      else
-       # get the cloud name and back into the "found_cloud_vendor" value so subsequent logic will work as expected.
-       # this is needed since the API may not always return a public_cloud_vendor_name value
-       $cloud_href = $price_hash["purchase_option"]["cloud_href"]
-       @cloud = rs.get(href: $cloud_href)
-       $cloud_name = @cloud.name
-       if $cloud_name =~ /Azure/
-         $found_cloud_vendor = "Microsoft Azure"
-       elsif $cloud_name =~ /Google/
-         $found_cloud_vendor = "Google"
-       elsif $cloud_name =~ /EC2/
-         $found_cloud_vendor = "Amazon Web Services"
-       else
-         $found_cloud_vendor = "VMware"
-       end
+       $found_cloud_vendor = "VMware"
      end
+   end
          
-#     call audit_log(join(["found vendor: ", $found_cloud_vendor]), "")
+#     call err_utilities,log(join(["found vendor: ", $found_cloud_vendor]), "")
 
      
      # We are ok with any Google or Azure type.
@@ -1025,7 +645,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      # Also the Google price_hash does not have a local_disk_size attribute so we can't just look at that.
      # Hence a multidimensional condition test
      if logic_or(logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), $found_cloud_vendor == "VMware"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
-#       call audit_log(join(["found a valid price_hash for ", $found_cloud_vendor]), to_s($price_hash))
+#       call err_utilities.log(join(["found a valid price_hash for ", $found_cloud_vendor]), to_s($price_hash))
 
        $purchase_options = keys($price_hash["purchase_option"])
          
@@ -1039,7 +659,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
            $price = ""
            foreach $usage_charge in $price_hash["usage_charges"] do
               $price = $usage_charge["price"]
-#              call audit_log(join(["Found price for ", $found_cloud_vendor, "; price: ", $price]), to_s($price_hash))
+#              call err_utilities.log(join(["Found price for ", $found_cloud_vendor, "; price: ", $price]), to_s($price_hash))
            end
            
            # Is it cheapest so far?
@@ -1052,7 +672,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
                $cloud_best_price = to_n($price)
                $cloud_href = $price_hash["purchase_option"]["cloud_href"]
                $instance_type = $price_hash["priceable_resource"]["name"]
-               @cloud = rs.clouds.get(href: $cloud_href)
+               @cloud = rs_cm.clouds.get(href: $cloud_href)
                $instance_type_href = @cloud.instance_types(filter: [join(["name==",$instance_type])]).href
                if contains?($purchase_options, ["datacenter_name"])  # then set the datacenter with that provided in the pricing info
                   $datacenter_name = $price_hash["purchase_option"]["datacenter_name"]
@@ -1085,7 +705,7 @@ define calc_app_cost(@web_tier) return $app_cost do
   $instance_cost = null
   
   # Get the hourly cost that we may have stored as a tag
-  $tags = rs.tags.by_resource(resource_hrefs: [@@deployment.href])
+  $tags = rs_cm.tags.by_resource(resource_hrefs: [@@deployment.href])
   $tag_array = $tags[0][0]['tags']
   $cost_tagged = false
   foreach $tag_item in $tag_array do
@@ -1114,32 +734,21 @@ define checkInstanceType($cloud_href, $instance_type, $supported_instance_types_
   # add instance types for the cloud_href if not already in the instance types hash
   if logic_not($supported_instance_types_hash[$cloud_href])
 
-    @cloud=rs.clouds.get(href: $cloud_href)
+    @cloud=rs_cm.clouds.get(href: $cloud_href)
     @instance_types = @cloud.instance_types().get()
     $instance_type_names=@instance_types.name[]
     $supported_instance_types_hash[$cloud_href] = $instance_type_names
     
-#    call audit_log(join(["Gathered instance types for cloud, ", $cloud_href]), to_s($instance_type_names))
+#    call err_utilities.log(join(["Gathered instance types for cloud, ", $cloud_href]), to_s($instance_type_names))
   end
   
   # Check if the instance type found in the pricing API is a supported instance type
   $usableInstanceType = contains?($supported_instance_types_hash[$cloud_href], [$instance_type])
   
 #  if logic_not($usableInstanceType)
-#    call audit_log(join(["Found unsupported instance type, ", to_s($instance_type), " in cloud, ", to_s($cloud_href)]), "")
+#    call err_utilities.log(join(["Found unsupported instance type, ", to_s($instance_type), " in cloud, ", to_s($cloud_href)]), "")
 #  end
 end
 
-
-define audit_log($summary, $details) do
-  rs.audit_entries.create(
-    notify: "None",
-    audit_entry: {
-      auditee_href: @@deployment,
-      summary: $summary,
-      detail: $details
-    }
-  )
-end
 
 

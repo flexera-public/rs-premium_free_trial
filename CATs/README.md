@@ -6,3 +6,5 @@ These CATs make certain assumptions:
 - They are purposely simple and self-contained so that customers can quickly understand how to use them.
 - Some CATs are examples only and are designed to raise errors - they are there to illustrate the breadth of what we can do.
 
+INSTALLATION NOTES:
+See the README file under the root folder.

@@ -1,5 +1,5 @@
 #Copyright 2015 RightScale
-#
+#x
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
@@ -26,7 +26,7 @@
 
 # Required prolog
 name 'Docker Swarm'
-rs_ca_ver 20131202
+rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/dockerswarm.png) 
 
 Launches a Docker Swarm cluster."
@@ -35,21 +35,32 @@ long_description "Launch a Docker Swarm cluster.\n
 Clouds Supported: <B>AWS, Google</B>"
 
 ##################
+# Imports        #
+##################
+
+import "pft/server_templates_utilities"
+import "pft/err_utilities"
+import "pft/cloud_utilities"
+import "pft/mappings", as: 'common_mappings'
+import "pft/parameters"
+import "pft/resources"
+import "pft/conditions"
+
+
+##################
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  actions   "rs.import"
-  resources "rs.publications"
+  like $server_templates_utilities.import_servertemplates
 end
 
 ##################
 # User inputs    #
 ##################
 parameter "param_location" do
+  like $parameters.param_location
+
   category "User Inputs"
-  label "Cloud"
-  type "string"
-  description "Cloud to deploy in."
   allowed_values "AWS" # Only AWS is currently supported at this time.
   default "AWS"
 end
@@ -64,11 +75,9 @@ parameter "param_num_nodes" do
 end
 
 parameter "param_costcenter" do 
+  like $parameters.param_costcenter
+
   category "User Inputs"
-  label "Cost Center" 
-  type "string" 
-  allowed_values "Development", "QA", "Production"
-  default "Development"
 end
 
 parameter "num_add_nodes" do
@@ -107,44 +116,8 @@ end
 ##############
 # MAPPINGS   #
 ##############
-mapping "map_cloud" do {
-  "AWS" => {
-    "cloud" => "EC2 us-east-1",
-    "zone" => null, # We don't care which az AWS decides to use.
-    "instance_type" => "m3.medium",
-    "sg" => '@sec_group',  
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "Azure" => {   
-    "cloud" => "Azure East US",
-    "zone" => null,
-    "instance_type" => "medium",
-    "sg" => null, 
-    "ssh_key" => null,
-    "pg" => "@placement_group",
-    "mci_mapping" => "Public",
-  },
-  "Google" => {
-    "cloud" => "Google",
-    "zone" => "us-central1-c", # launches in Google require a zone
-    "instance_type" => "n1-standard-2",
-    "sg" => '@sec_group',  
-    "ssh_key" => null,
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "VMware" => {
-    "cloud" => "VMware Private Cloud",
-    "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified  
-    "instance_type" => "large",
-    "sg" => null, 
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "VMware",
-  }
-}
+mapping "map_cloud" do
+  like $common_mappings.map_cloud
 end
 
 mapping "map_st" do {
@@ -173,25 +146,26 @@ mapping "map_mci" do {
 # CONDITIONS     #
 ##################
 
+# Used to decide whether or not to pass an SSH key or security group when creating the servers.
 condition "needsSshKey" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "VMware"))
+  like $conditions.needsSshKey
 end
 
 condition "needsSecurityGroup" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google"))
-end
-
-condition "invSphere" do
-  equals?($param_location, "VMware")
-end
-
-condition "inAzure" do
-  equals?($param_location, "Azure")
+  like $conditions.needsSecurityGroup
 end
 
 condition "needsPlacementGroup" do
-  equals?($param_location, "Azure")
-end 
+  like $conditions.needsPlacementGroup
+end
+
+condition "invSphere" do
+  like $conditions.invSphere
+end
+
+condition "inAzure" do
+  like $conditions.inAzure
+end
 
 ############################
 # RESOURCE DEFINITIONS     #
@@ -288,8 +262,7 @@ end
 
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
-  name join(["sshkey_", last(split(@@deployment.href,"/"))])
-  cloud map($map_cloud, $param_location, "cloud")
+  like @resources.ssh_key
 end
 
 ####################
@@ -310,7 +283,8 @@ operation "launch" do
  
 end
 
-operation "Add Nodes to Swarm" do
+operation "add_nodes_to_swarm" do
+  label "Add Nodes to Swarm"
   description "Adds (scales out) nodes to the Swarm."
   definition "add_nodes"
   hash = {}
@@ -336,10 +310,10 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call checkCloudSupport($cloud_name, $param_location)
+  call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call importServerTemplate($map_st)
+  call server_templates_utilities.importServerTemplate($map_st)
     
   # Provision all the needed resources
   
@@ -359,7 +333,7 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
     sub task_name:"Launch Swarm Manager" do
       task_label("Launching Swarm Manager")
       $swarm_manager_retries = 0 
-      sub on_error: handle_retries($swarm_manager_retries) do
+      sub on_error: err.handle_retries($swarm_manager_retries) do
         $swarm_manager_retries = $swarm_manager_retries + 1
         provision(@swarm_manager)
       end
@@ -368,7 +342,7 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
     sub task_name:"Launch Swarm Node Cluster" do
       task_label("Launching Swarm Node Cluster")
       $swarm_node_retries = 0 
-      sub on_error: handle_retries($swarm_node_retries) do
+      sub on_error: err.handle_retries($swarm_node_retries) do
         $swarm_node_retries = $swarm_node_retries + 1
         provision(@swarm_node)
       end
@@ -376,15 +350,15 @@ define launch(@swarm_manager, @swarm_node, @ssh_key, @sec_group, @sec_group_rule
   end
   
   # Now we re-run the manager script so the swarm manager will discover the swarm nodes.
-  call run_script("APP docker swarm manage", @swarm_manager)
+  call server_templates_utilities.run_script_no_inputs(@swarm_manager, "APP docker swarm manage")
   
   # Now tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
-  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
-  rs.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
 
   # Get the array of node instances IDs from the server array.
-  @instances= rs.get(href: @@deployment.href).server_arrays().current_instances()
+  @instances= rs_cm.get(href: @@deployment.href).server_arrays().current_instances()
   
   # Get a list of node IDs as they appear when listing nodes or containers in docker.
   # In AWS this is basically the host name which is the first part of the private DNS name.
@@ -407,7 +381,7 @@ define add_nodes(@swarm_node, @swarm_manager, $num_add_nodes) return $swarm_node
   $wake_condition = "/^(operational|stranded|stranded in booting|stopped|terminated|inactive|error)$/"
   sleep_until all?(@swarm_node.current_instances().state[], $wake_condition)
   
-  rs.audit_entries.create(auditee_href: @@deployment, summary: "instance states after waking", detail: to_s(@swarm_node.current_instances().state[]))
+  rs_cm.audit_entries.create(auditee_href: @@deployment, summary: "instance states after waking", detail: to_s(@swarm_node.current_instances().state[]))
 
   if !all?(@swarm_node.current_instances().state[], "operational")
     raise "Some instances failed to start"    
@@ -423,46 +397,3 @@ define add_nodes(@swarm_node, @swarm_manager, $num_add_nodes) return $swarm_node
     $swarm_node_ids << [ split(@instance.private_dns_names[0], ".")[0] ]
   end
 end
-
-# Checks if the account supports the selected cloud
-define checkCloudSupport($cloud_name, $param_location) do
-  # Gather up the list of clouds supported in this account.
-  @clouds = rs.clouds.get()
-  $supportedClouds = @clouds.name[] # an array of the names of the supported clouds
-  
-  # Check if the selected/mapped cloud is in the list and yell if not
-  if logic_not(contains?($supportedClouds, [$cloud_name]))
-    raise "Your trial account does not support the "+$param_location+" cloud. Contact RightScale for more information on how to enable access to that cloud."
-  end
-end
-
-# Imports the server templates found in the given map.
-# It assumes a "name" and "rev" mapping
-define importServerTemplate($stmap) do
-  foreach $st in keys($stmap) do
-    $server_template_name = map($stmap, $st, "name")
-    $server_template_rev = map($stmap, $st, "rev")
-    @pub_st=rs.publications.index(filter: ["name=="+$server_template_name, "revision=="+$server_template_rev])
-    @pub_st.import()
-  end
-end
-
-# Used for retry mechanism
-define handle_retries($attempts) do
-  if $attempts < 3
-    $_error_behavior = "retry"
-    sleep(60)
-  end # If it fails 3 times just let it raise the error
-end
-
-# Runs a rightscript on the given target node
-define run_script($script_name, @target) do
-  @script = rs.right_scripts.get(latest_only: true, filter: join(["name==",$script_name]))
-  $right_script_href=@script.href
-  @task = @target.current_instance().run_executable(right_script_href: $right_script_href, inputs: {})
-  if @task.summary =~ "failed"
-    raise "Failed to run " + $script_name + " on server, " + @target.href
-  end 
-end
-
-

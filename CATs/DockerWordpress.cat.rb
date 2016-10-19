@@ -1,5 +1,5 @@
 #Copyright 2015 RightScale
-#
+#x
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
@@ -33,7 +33,7 @@
 
 # Required prolog
 name 'C) Docker Container with  WordPress'
-rs_ca_ver 20131202
+rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png) 
 
 Launch a Docker container with WordPress"
@@ -41,23 +41,25 @@ long_description "Launch a Docker server and run WordPress and Database containe
 \n
 Clouds Supported: <B>AWS, Azure, Google, VMware</B>"
 
+import "pft/parameters"
+import "pft/outputs"
+import "pft/conditions"
+import "pft/mappings"
+import "pft/resources"
+import "pft/server_templates_utilities"
+import "pft/err_utilities"
+import "pft/cloud_utilities"
+
+
 ##################
 # User inputs    #
 ##################
-parameter "param_location" do 
-  category "Deployment Options"
-  label "Cloud" 
-  type "string" 
-  allowed_values "AWS", "Azure", "Google", "VMware" 
-  default "Google"
+parameter "param_location" do
+  like $parameters.param_location
 end
 
 parameter "param_costcenter" do 
-  category "Deployment Options"
-  label "Cost Center" 
-  type "string" 
-  allowed_values "Development", "QA", "Production"
-  default "Development"
+  like $parameters.param_costcenter
 end
 
 
@@ -70,53 +72,14 @@ output "wordpress_url" do
 end
 
 output "vmware_note" do
-  condition $invSphere
-  label "Deployment Note"
-  category "Output"
-  default_value "Your CloudApp was deployed in a VMware environment on a private network and so is not directly accessible. If you need access to the CloudApp, please contact your RightScale rep for network access."
+  like $outputs.vmware_note
 end
 
 ##############
 # MAPPINGS   #
 ##############
-mapping "map_cloud" do {
-  "AWS" => {
-    "cloud" => "EC2 us-east-1",
-    "zone" => null, # We don't care which az AWS decides to use.
-    "instance_type" => "m3.medium",
-    "sg" => '@sec_group',  
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "Azure" => {   
-    "cloud" => "Azure East US",
-    "zone" => null,
-    "instance_type" => "D1",
-    "sg" => null, 
-    "ssh_key" => null,
-    "pg" => "@placement_group",
-    "mci_mapping" => "Public",
-  },
-  "Google" => {
-    "cloud" => "Google",
-    "zone" => "us-central1-c", # launches in Google require a zone
-    "instance_type" => "n1-standard-2",
-    "sg" => '@sec_group',  
-    "ssh_key" => null,
-    "pg" => null,
-    "mci_mapping" => "Public",
-  },
-  "VMware" => {
-    "cloud" => "VMware Private Cloud",
-    "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified  
-    "instance_type" => "large",
-    "sg" => null, 
-    "ssh_key" => "@ssh_key",
-    "pg" => null,
-    "mci_mapping" => "VMware",
-  }
-}
+mapping "map_cloud" do
+  like $mappings.map_cloud
 end
 
 mapping "map_st" do {
@@ -197,25 +160,20 @@ end
 ### SSH Key ###
 resource "ssh_key", type: "ssh_key" do
   condition $needsSshKey
-
-  name join(["sshkey_", last(split(@@deployment.href,"/"))])
-  cloud map($map_cloud, $param_location, "cloud")
+  like @resources.ssh_key
 end
 
 ### Placement Group ###
 resource "placement_group", type: "placement_group" do
   condition $needsPlacementGroup
-
-  name last(split(@@deployment.href,"/"))
-  cloud map($map_cloud, $param_location, "cloud")
+  like @resources.placement_group
 end 
 
 ##################
 # Permissions    #
 ##################
 permission "import_servertemplates" do
-  actions   "rs.import"
-  resources "rs.publications"
+  like $server_templates_utilities.import_servertemplates
 end
 
 ##################
@@ -224,23 +182,23 @@ end
 
 # Used to decide whether or not to pass an SSH key or security group when creating the servers.
 condition "needsSshKey" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "VMware"))
+  like $conditions.needsSshKey
 end
 
 condition "needsSecurityGroup" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google"))
+  like $conditions.needsSecurityGroup
 end
 
 condition "needsPlacementGroup" do
-  equals?($param_location, "Azure")
+  like $conditions.needsPlacementGroup
 end
 
 condition "invSphere" do
-  equals?($param_location, "VMware")
+  like $conditions.invSphere
 end
 
 condition "inAzure" do
-  equals?($param_location, "Azure")
+  like $conditions.inAzure
 end
 
 ####################
@@ -273,10 +231,10 @@ define pre_auto_launch($map_cloud, $param_location, $map_st) do
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call checkCloudSupport($cloud_name, $param_location)
+  call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
     
   # Find and import the server template - just in case it hasn't been imported to the account already
-  call importServerTemplate($map_st)
+  call server_templates_utilities.importServerTemplate($map_st)
 
 end
     
@@ -284,7 +242,7 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $w
     
   # Tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
-  rs.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
   # Get the appropriate IP address depending on the environment.
   if $invSphere
@@ -305,7 +263,7 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $w
 
   if $inAzure
     # Find the current bindings for the namenode instance and then drill down to find the IP address href
-    @bindings = rs.clouds.get(href: @docker_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @docker_server.current_instance().href])
+    @bindings = rs_cm.clouds.get(href: @docker_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @docker_server.current_instance().href])
     @binding = select(@bindings, {"private_port":22})
     @ipaddr = @binding.ip_address()
      
@@ -321,45 +279,7 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $w
   
   # For some reason in Azure, the docker containers - esp wordpress - don't get started as expected.
   # Although this has only been seen in Azure we'll force a start in all clouds - just to be safe.
-  $script_name = "APP docker services up"
-  @script = rs.right_scripts.get(filter: join(["name==",$script_name]))
-  $right_script_href=@script.href
-  @task = @docker_server.current_instance().run_executable(right_script_href: $right_script_href, inputs: {})
-  if @task.summary =~ "failed"
-    raise "Failed to run " + $right_script_href + " on server, " + @docker_server.href
-  end 
-end
+  call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services up")
 
-# Checks if the account supports the selected cloud
-define checkCloudSupport($cloud_name, $param_location) do
-  # Gather up the list of clouds supported in this account.
-  @clouds = rs.clouds.get()
-  $supportedClouds = @clouds.name[] # an array of the names of the supported clouds
-  
-  # Check if the selected/mapped cloud is in the list and yell if not
-  if logic_not(contains?($supportedClouds, [$cloud_name]))
-    raise "Your trial account does not support the "+$param_location+" cloud. Contact RightScale for more information on how to enable access to that cloud."
-  end
-end
-
-# Imports the server templates found in the given map.
-# It assumes a "name" and "rev" mapping
-define importServerTemplate($stmap) do
-  foreach $st in keys($stmap) do
-    $server_template_name = map($stmap, $st, "name")
-    $server_template_rev = map($stmap, $st, "rev")
-    @pub_st=rs.publications.index(filter: ["name=="+$server_template_name, "revision=="+$server_template_rev])
-    @pub_st.import()
-  end
-end
- 
-# Helper functions
-define handle_retries($attempts) do
-  if $attempts < 3
-    $_error_behavior = "retry"
-    sleep(60)
-  else
-    $_error_behavior = "skip"
-  end
 end
 
