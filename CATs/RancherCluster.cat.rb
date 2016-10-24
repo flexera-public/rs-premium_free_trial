@@ -26,7 +26,7 @@
 # Store the API keys in CREDENIALs and use cred: in inputs instead of current clear text approach.
 # Support more clouds. This would require coordinating with the ST author to add images in other clouds.
 
-name 'Debugging Inputs Issue Rancher Cluster'
+name 'Rancher Cluster'
 rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_logo.png) ![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
 
@@ -468,8 +468,6 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   $rancher_infra_uri = join([$rancher_ui_uri, "infra/hosts"])
   
   # Test the API to make sure the server is ready
-call err_utilities.log("DEBUG: A - before rancher_api call", "")
-
   call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
   while (type($body)  == 'string') do
     call err_utilities.log("debug:  check api response type", to_s(type($body)))
@@ -477,9 +475,6 @@ call err_utilities.log("DEBUG: A - before rancher_api call", "")
     sleep(15)
     call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
   end
-  
-    call err_utilities.log("DEBUG: A - After rancher_api call", "")
-
 
   # Get the keys from the API
   call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
@@ -610,7 +605,7 @@ define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_comp
     'RANCHER_COMPOSE_RANCHER_YAML':join(['text:', $rancher_compose])
   }
   
-  call server_templates_utilities.run_script_no_inputs(@rancher_server, "Run rancher-compose")
+  call server_templates_utilities.run_script_inputs(@rancher_server, "Run rancher-compose", $inp)
  
 end
 
@@ -773,27 +768,21 @@ define rancher_api(@rancher_server, $action, $api_uri, $message_part_returned) r
     $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
     $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080"])
     $api_url = join([$rancher_ui_uri, $api_uri])
-  end
-  
-call err_utilities.log("DEBUG: B - rancher_api - api_uri: "+$api_uri, "")
- 
+  end 
   
   # Set up basic auth credentials in case user has enabled access control via the Rancher UI
   $inputs_array = @rancher_server.current_instance().inputs()
   $inputs = $inputs_array[0]
-  $username = ""
-  $password = ""
+  $username = "tbd"
+  $password = "tbd"
   foreach $input in $inputs do
-    if $input["name"] == "RANCHER_COMPOSE_ACCESS_KEY"
-      $username = split($input["value"], ":")[1]
-    elsif $input["name"] == "RANCHER_COMPOSE_SECRET_KEY"
+    if $input["name"] == "RANCHER_COMPOSE_ACCESS_KEY" && split($input["value"], ":")[1]
+        $username = split($input["value"], ":")[1]
+    elsif $input["name"] == "RANCHER_COMPOSE_SECRET_KEY" && split($input["value"], ":")[1]
       $password = split($input["value"], ":")[1]
     end
   end
   
-call err_utilities.log("DEBUG: B - rancher_api - username/password: "+to_s($username)+"/"+to_s($password), "")
-
-    
   # Call the rancher server API 
   if $action == "post"
     $response = http_post(
@@ -816,9 +805,6 @@ call err_utilities.log("DEBUG: B - rancher_api - username/password: "+to_s($user
   else 
     raise "Unknown API action: " + $action
   end
-  
-call err_utilities.log("DEBUG: B - rancher_api - response: ", to_s($response))
-
   
   $api_response = $response["body"]
     
