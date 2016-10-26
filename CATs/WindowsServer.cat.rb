@@ -300,7 +300,7 @@ define enable(@windows_server, $param_costcenter, $inAzure) return $server_ip_ad
      $server_ip_address = join([to_s(@windows_server.current_instance().public_ip_addresses[0]),":",@binding.public_port])
   else
     # If not in Azure, then we can actually provide the SSH link like that found in CM.
-    call account_utilities.find_shard retrieve $shard_number
+    call account_utilities.find_shard() retrieve $shard_number
     call account_utilities.find_account_number() retrieve $account_number
     call account_utilities.get_server_access_link(@windows_server, "RDP", $shard_number, $account_number) retrieve $server_ip_address
   end
