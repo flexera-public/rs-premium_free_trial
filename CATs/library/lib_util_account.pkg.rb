@@ -58,44 +58,15 @@ define get_server_access_link(@server, $link_type, $shard, $account_number) retu
 
 end
 
-
 # Returns the RightScale account number in which the CAT was launched.
-define find_account_number() return $rs_account_number do
-  $cloud_accounts = to_object(first(rs_cm.cloud_accounts.get()))
-  @info = first(rs_cm.cloud_accounts.get())
-  $info_links = @info.links
-  $rs_account_info = select($info_links, { "rel": "account" })[0]
-  $rs_account_href = $rs_account_info["href"]  
-    
-  $rs_account_number = last(split($rs_account_href, "/"))
-  #rs_cm.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: "rs_account_number" , detail: to_s($rs_account_number)})
+define find_account_number() return $account_id do
+  $session = rs_cm.sessions.index(view: "whoami")
+  $account_id = last(split(select($session[0]["links"], {"rel":"account"})[0]["href"],"/"))
 end
   
 # Returns the RightScale shard for the account the given CAT is launched in.
-# It relies on the fact that when a CAT is launched, the resultant deployment description includes a link
-# back to Self-Service. 
-# This link is exploited to identify the shard.
-# Of course, this is somewhat dangerous because if the deployment description is changed to remove that link, 
-# this code will not work.
-# Similarly, since the deployment description is also based on the CAT description, if the CAT author or publisher
-# puts something like "selfservice-8" in it for some reason, this code will likely get confused.
-# However, for the time being it's fine.
-define find_shard(@deployment) return $shard_number do
-  
-  $deployment_description = @deployment.description
-  #rs_cm.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: "deployment description" , detail: $deployment_description})
-  
-  # initialize a value
-  $shard_number = "UNKNOWN"
-  foreach $word in split($deployment_description, "/") do
-    if $word =~ "selfservice-" 
-    #rs_cm.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: join(["found word:",$word]) , detail: ""}) 
-      foreach $character in split($word, "") do
-        if $character =~ /[0-9]/
-          $shard_number = $character
-          #rs_cm.audit_entries.create(notify: "None", audit_entry: { auditee_href: @deployment, summary: join(["found shard:",$character]) , detail: ""}) 
-        end
-      end
-    end
-  end
+define find_shard() return $shard_number do
+  call find_account_number() retrieve $account_number
+  $account = rs_cm.get(href: "/api/accounts/" + $account_number)
+  $shard_number = last(split(select($account[0]["links"], {"rel":"cluster"})[0]["href"],"/"))
 end
