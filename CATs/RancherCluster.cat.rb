@@ -680,7 +680,7 @@ define get_app_lists(@rancher_server) return $app_names, $app_links, $app_graphs
 
   # Make sure there is at least one stack deployed on the cluster
   if logic_not(empty?($envs_array))  
-
+    
     # Go through each application and gather up the information
     foreach $env_spec in $envs_array do
       $lb_host_ip_address = ""
@@ -699,26 +699,33 @@ define get_app_lists(@rancher_server) return $app_names, $app_links, $app_graphs
         
       # Loop through the services launched for the given stack
       $app_services_url = $env_spec["links"]["services"]
-      call rancher_api(@rancher_server, "get", $app_services_url, "data") retrieve $app_services
+        
+      call check_app_services_are_ready($app_services_url) retrieve $app_services
+      
       foreach $app_service in $app_services do
           
         # We only care about the loadbalancer service
         if $app_service["type"] == "loadBalancerService"
           $lb_service_instance_url = $app_service["links"]["instances"]
           call rancher_api(@rancher_server, "get", $lb_service_instance_url, "data") retrieve $lb_service_instance
+          call err_utilities.log("lb_service_instance:", to_s($lb_service_instance))
           
           $lb_service_host_url = $lb_service_instance[0]["links"]["hosts"]
           call rancher_api(@rancher_server, "get", $lb_service_host_url, "data") retrieve $lb_service_host
+          call err_utilities.log("lb_service_host:", to_s($lb_service_host))
           
           $lb_service_host_ip_url = $lb_service_host[0]["links"]["ipAddresses"]
           call rancher_api(@rancher_server, "get", $lb_service_host_ip_url, "data") retrieve $lb_service_host_ip_info
+          call err_utilities.log("lb_service_host_ip_info:", to_s($lb_service_host_ip_info))
           
           # Here's the Easter egg we've been searching for
           $lb_host_ip_address = $lb_service_host_ip_info[0]["address"]
+          call err_utilities.log("lb_host_ip_address: "+$lb_host_ip_address, "")
         end
       end
     
       $app_link = "http://" + $lb_host_ip_address
+      call err_utilities.log("app_link: "+$app_link, "")
         
       $app_names << [$app_name]
       $app_links << [$app_link]
@@ -812,5 +819,22 @@ define rancher_api(@rancher_server, $action, $api_uri, $message_part_returned) r
     $api_response = $api_response["data"]
   end
 
+end
+
+
+# Sometimes there's a race condition with the CAT gathering up the application list and the services really be ready.
+# So this function gets the app_services checks to make sure the services are ready.
+define check_app_services_are_ready($app_services_url) return $app_services do
+  $app_services = ""
+  $not_ready = true
+  while $not_ready do
+    call rancher_api(@rancher_server, "get", $app_services_url, "data") retrieve $app_services      
+    foreach $app_service in $app_services do
+      # The key is the load balancer service so if it's there and active then this application stack is good to go
+      if $app_service["type"] == "loadBalancerService" && $app_service["state"] == "active"
+        $not_ready = false
+      end
+    end
+  end
 end
 
