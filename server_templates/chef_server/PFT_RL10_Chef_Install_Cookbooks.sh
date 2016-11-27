@@ -1,22 +1,49 @@
 #! /usr/bin/sudo /bin/bash
 # ---
-# RightScript Name: PFT RL10 Chef Create Org
-# Description: Creates a new organization on a chef server using
-#   chef-server-ctl, as described at ->
-#   (https://docs.chef.io/install_server.html#standalone)
-# Inputs: {}
+# RightScript Name: PFT RL10 Chef Install Cookbooks
+# Description: Installs all the cookbooks for rs-haproxy
+# Inputs:
+#   CHEF_ADMIN_USERNAME:
+#     Category: CHEF
+#     Description: Chef administrator users username
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   CHEF_ORG_NAME:
+#     Category: CHEF
+#     Description: Short name for new org (also used as the long name)
+#     Input Type: single
+#     Required: true
+#     Advanced: true
+#     Default: text:pft
 # Attachments: []
 # ...
 
 set -e
 
+if [ -z "`which berkshelf`"]; then
+  apt-add-repository ppa:brightbox/ruby-ng -y
+  apt-get update
+  apt-get install -y ruby2.2 ruby2.2-dev
 
-apt-add-repository ppa:brightbox/ruby-ng -y
-apt-get update
-apt-get install -y ruby2.2 ruby2.2-dev
-
-gem2.2 install berkshelf
+  gem2.2 install berkshelf
+fi
 
 cd /tmp
-
+cat > berkshelf.json << EOF
+{
+  "chef": {
+    "chef_server_url": "https://localhost/organizations/$CHEF_ORG_NAME",
+    "client_key": "/srv/chef-server/admin-users/$CHEF_ADMIN_USERNAME.pem",
+    "validation_key": "/srv/chef-server/orgs/$CHEF_ORG_NAME-validator.pem",
+    "node_name": "$CHEF_ADMIN_USERNAME"
+  },
+  "ssl": {
+    "verify": false
+  }
+}
+EOF
 git clone https://github.com/rightscale-cookbooks/rs-haproxy.git
+cd /tmp/rs-haproxy
+git checkout v1.2.0
+berks install && berks upload -c /tmp/berkshelf.json
