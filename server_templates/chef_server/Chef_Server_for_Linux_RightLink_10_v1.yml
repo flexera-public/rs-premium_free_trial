@@ -39,6 +39,10 @@ RightScripts:
   - RL10_Linux_Setup_Alerts.sh
   - RL10_Linux_Setup_Automatic_Upgrade.sh
   - RL10_Chef_Server_Install.sh
+  - PFT_RL10_Chef_Create_Admin_User.sh
+  - PFT_RL10_Chef_Create_Org.sh
+  - PFT_RL10_Chef_Validator_Pem_to_Tag.sh
+  - PFT_RL10_Chef_Cert_to_Tag.sh
   Decommission:
   - RL10_Linux_Shutdown_Reason.sh
   Operational:
@@ -47,6 +51,10 @@ RightScripts:
   - RL10_Chef_Server_Schedule_Backup.sh
   - RL10_Linux_Setup_Automatic_Upgrade.sh
   - RL10_Linux_Upgrade.sh
+  - PFT_RL10_Chef_Create_Admin_User.sh
+  - PFT_RL10_Chef_Create_Org.sh
+  - PFT_RL10_Chef_Validator_Pem_to_Tag.sh
+  - PFT_RL10_Chef_Cert_to_Tag.sh
 MultiCloudImages:
 - Name: Ubuntu_14.04_x64
   Revision: 52
