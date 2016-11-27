@@ -55,32 +55,29 @@ RightScripts:
   - PFT_RL10_Chef_Create_Org.sh
   - PFT_RL10_Chef_Validator_Pem_to_Tag.sh
   - PFT_RL10_Chef_Cert_to_Tag.sh
-MultiCloudImages:
+MultiCloudImages:  
+- Name: Ubuntu_14.04_x64 (Current Google)
+# - Name: PFT_Ubuntu_16.04_x64
+#   Description: Ubuntu 16.04-LTS
+#   Tags:
+#     - rs_agent:type=right_link_lite
+#     - rs_agent:mime_shellscript=https://rightlink.rightscale.com/rll/10.5.3/rightlink.boot.sh
+#   Settings:
+#     - Cloud: EC2 us-east-1
+#       Instance Type: t2.micro
+#       Image: ami-45b69e52
+#     - Cloud: Google
+#       Instance Type: n1-standard-1
+#       Image: projects/ubuntu-os-cloud/images/ubuntu-1604-xenial-v20161115
+#     - Cloud: AzureRM East US
+#       Instance Type: Standard_A0
+#       Image: /Locations/eastus/Publishers/Canonical/ArtifactTypes/VMImage/Offers/UbuntuServer/Skus/16.04-LTS/Versions/latest
 - Name: Ubuntu_14.04_x64
   Revision: 52
-  Publisher: RightScale
-- Name: CentOS_7.1_x64
-  Revision: 27
-  Publisher: RightScale
-- Name: Ubuntu_12.04_x64
-  Revision: 51
-  Publisher: RightScale
-- Name: CentOS_6.7_x64_KVM
-  Revision: 26
-  Publisher: RightScale
-- Name: CentOS_7.2_x64_KVM
-  Revision: 25
-  Publisher: RightScale
-- Name: Ubuntu_12.04_x64_KVM
-  Revision: 27
   Publisher: RightScale
 - Name: Ubuntu_14.04_x64_KVM
   Revision: 27
   Publisher: RightScale
-- Name: CentOS_6.7_x64
-  Revision: 19
-  Publisher: RightScale
-- Name: Ubuntu_14.04_x64 (Current Google)
 Alerts:
 - Name: rs instance terminated
   Description: Raise an alert if the instance has been terminated abnormally, i.e.
