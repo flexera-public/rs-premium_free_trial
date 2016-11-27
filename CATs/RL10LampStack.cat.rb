@@ -188,6 +188,20 @@ resource "sec_group", type: "security_group" do
   like @lamp_resources.sec_group
 end
 
+resource "sec_group_rule_https", type: "security_group_rule" do
+  name "CAT HTTP Rule"
+  description "Allow HTTPS access."
+  source_type "cidr_ips"
+  security_group @lamp_resources.sec_group
+  protocol "tcp"
+  direction "ingress"
+  cidr_ips "0.0.0.0/0"
+  protocol_details do {
+    "start_port" => "443",
+    "end_port" => "443"
+  } end
+end
+
 resource "sec_group_rule_http", type: "security_group_rule" do
   like @lamp_resources.sec_group_rule_http
 end
