@@ -160,6 +160,8 @@ resource 'chef_server', type: 'server' do
     'EMAIL_FROM_ADDRESS' => 'text:pft@rightscale.com',
     'CHEF_NOTIFICATON_EMAIL' => 'text:ryan@rightscale.com',
     'CHEF_SERVER_FQDN' => 'env:PUBLIC_IP', # Maybe private is better? Maybe we do some DNS here?
+    'CHEF_SERVER_VERSION' => 'text:12.11.1',
+    'COOKBOOK_VERSION' => 'text:v1.0.3',
     'CHEF_ORG_NAME' => 'text:pft',
     'CHEF_ADMIN_EMAIL' => 'text:ryan@rightscale.com',
     'CHEF_ADMIN_FIRST_NAME' => 'text:Ryan',
@@ -269,6 +271,10 @@ define launch(@ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http80
 
   provision(@chef_server)
   $key = gsub(gsub(tag_value(@chef_server.current_instance(), 'chef_org_validator:pft'), ',', '\n'), 'eq;', '=')
-  $credname = 'PFT-LAMP-ChefValidator-'+uuid()
+  $credname = 'PFT-LAMP-ChefValidator-'+last(split(@@deployment.href,"/"))
   rs_cm.credentials.create(credential: {name: $credname, value: $key})
+
+  $cert = gsub(gsub(tag_value(@chef_server.current_instance(), 'chef_server:ssl_cert'), ',', '\n'), 'eq;', '=')
+  $credname = 'PFT-LAMP-ChefCert-'+last(split(@@deployment.href,"/"))
+  rs_cm.credentials.create(credential: {name: $credname, value: $cert})
 end
