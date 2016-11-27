@@ -13,7 +13,7 @@ set -e
 
 apt-add-repository ppa:brightbox/ruby-ng -y
 apt-get update
-apt-get install -y ruby2.2
+apt-get install -y ruby2.2 ruby2.2-dev
 
 gem2.2 install berkshelf
 
