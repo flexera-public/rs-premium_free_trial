@@ -49,7 +49,7 @@ mapping "map_instancetype" do {
     "AWS" => "m3.medium",
     "Azure" => "D1",
     "Google" => "n1-standard-1",
-    "VMware" => "medium",
+    "VMware" => "small",
   },
   "High Performance" => {
     "AWS" => "m3.large",
