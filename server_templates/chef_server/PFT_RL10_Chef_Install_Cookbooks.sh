@@ -45,5 +45,10 @@ cat > berkshelf.json << EOF
 EOF
 git clone https://github.com/rightscale-cookbooks/rs-haproxy.git
 cd /tmp/rs-haproxy
-git checkout v1.2.0
+git checkout v1.2.3
+berks install && berks upload -c /tmp/berkshelf.json
+
+git clone https://github.com/rightscale-cookbooks/rs-mysql.git /tmp/rs-mysql
+cd /tmp/rs-mysql
+git checkout v1.2.5
 berks install && berks upload -c /tmp/berkshelf.json
