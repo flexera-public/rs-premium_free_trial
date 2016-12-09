@@ -8,10 +8,16 @@
 # - Update the MCI to use the existent images found in the Ubuntu 14.04 MCI
 # - Add the VMware image to the MCI
 # - Update the pointer to use the latest 14.04 Trusty Google image.
+#
+# TO-DOs
+# - The CAT takes several minutes to run. I think it's related to the looping through the settings collections and hitting the
+#   .cloud() link/API call. Could probably do something where I do a single walk through the collections and build hashes.
+#   But that would mess up some of the modularity in the mci_management.pkg.rb definitions.
 
 name "PFT Admin CAT - PFT Base Linux MCI Setup/Maintenance"
 rs_ca_ver 20160622
-short_description "Used for PFT account administration. This CAT is used to create/update/maintain the 'PFT Base Linux MCI' MCI used by other PFT assets."
+short_description "Used for PFT account administration.\n
+This CAT is used to create/update/maintain the 'PFT Base Linux MCI' MCI used by other PFT assets."
 
 import "pft/mci"
 
