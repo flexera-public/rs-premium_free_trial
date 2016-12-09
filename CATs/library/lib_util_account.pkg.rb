@@ -70,3 +70,11 @@ define find_shard() return $shard_number do
   $account = rs_cm.get(href: "/api/accounts/" + $account_number)
   $shard_number = last(split(select($account[0]["links"], {"rel":"cluster"})[0]["href"],"/"))
 end
+
+define getUserLogin() return $userlogin do
+
+  $userid = @@execution.created_by["email"]
+
+  $userlogin = rs_cm.users.get(filter: "email=="+$userid).login_name
+
+end

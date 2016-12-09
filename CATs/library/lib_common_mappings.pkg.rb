@@ -23,6 +23,15 @@ mapping "map_cloud" do {
     "pg" => "@placement_group",
     "mci_mapping" => "Public",
   },
+  "AzureRM" => {   
+    "cloud" => "AzureRM East US",
+    "zone" => null,
+    "instance_type" => "D1",
+    "sg" =>  "@sec_group", 
+    "ssh_key" => null,
+    "pg" => null,
+    "mci_mapping" => "Public",
+  },
   "Google" => {
     "cloud" => "Google",
     "zone" => "us-central1-c", # launches in Google require a zone
@@ -48,12 +57,14 @@ mapping "map_instancetype" do {
   "Standard Performance" => {
     "AWS" => "m3.medium",
     "Azure" => "D1",
+    "AzureRM" => "D1",
     "Google" => "n1-standard-1",
     "VMware" => "medium",
   },
   "High Performance" => {
     "AWS" => "m3.large",
     "Azure" => "D2",
+    "AzureRM" => "D1",
     "Google" => "n1-standard-2",
     "VMware" => "large",
   }
