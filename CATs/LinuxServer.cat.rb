@@ -108,6 +108,8 @@ resource "linux_server", type: "server" do
   name join(['Linux Server-',last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
+  network find(map($map_cloud, $param_location, "network"))
+  subnets find(map($map_cloud, $param_location, "subnet"))
   instance_type map($map_instancetype, $param_instancetype, $param_location)
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
@@ -141,6 +143,7 @@ resource "placement_group", type: "placement_group" do
   like @common_resources.placement_group
 end 
 
+
 ##################
 # CONDITIONS     #
 ##################
@@ -166,13 +169,16 @@ condition "inAzure" do
   like $conditions.inAzure
 end 
 
+condition "inAzureRM" do
+  like $conditions.inAzureRM
+end 
+
 ####################
 # OPERATIONS       #
 ####################
 operation "launch" do 
   description "Launch the server"
   definition "pre_auto_launch"
-
 end
 
 operation "enable" do
@@ -192,7 +198,6 @@ end
 # Import and set up what is needed for the server and then launch it.
 define pre_auto_launch($map_cloud, $param_location, $invSphere) do
   
-
     # Need the cloud name later on
     $cloud_name = map( $map_cloud, $param_location, "cloud" )
 

@@ -4,8 +4,6 @@ short_description "RCL definitions for gathering account and related information
 
 package "pft/account_utilities"
 
-
-
 # Returns either an RDP or SSH link for the given server.
 # This link can be provided as an output for a CAT and the user can select it to to get the
 # RDP or SSH file just like in Cloud Management.
@@ -72,9 +70,8 @@ define find_shard() return $shard_number do
 end
 
 define getUserLogin() return $userlogin do
-
-  $userid = @@execution.created_by["email"]
-
-  $userlogin = rs_cm.users.get(filter: "email=="+$userid).login_name
-
+  $session = rs_cm.sessions.index(view: "whoami")
+  $user_id = select($session[0]["links"], {"rel":"user"})[0]["href"]
+  @user = rs_cm.get(href: $user_id)
+  $userlogin = @user.login_name
 end
