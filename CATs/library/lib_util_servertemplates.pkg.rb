@@ -82,6 +82,6 @@ define get_instance_collection(@target) return @target_instances do
   elsif equals?($target_type, "rs_cm.instances")
     @target_instances = @target
   else
-    call err.log("get_instance_collection: Unrecognized target type: "+to_s($target_type), to_s(@target))
+    call err_utilities.log("get_instance_collection: Unrecognized target type: "+to_s($target_type), to_s(@target))
   end
 end
