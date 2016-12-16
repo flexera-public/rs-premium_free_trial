@@ -1,13 +1,4 @@
-# This CAT is used to create and manage the Linux MCI that PFT ServerTemplates reference and use.
-# The intent is that this CAT is run in an account as part of its preparation for a PFT Trial.
-
-# Basic Design:
-# - Import the latest Ubuntu 14.04 MCI 
-# - Check if there is an MCI named "PFT Base Linux MCI" already.
-# - If not, create one.
-# - Update the MCI to use the existent images found in the Ubuntu 14.04 MCI
-# - Add the VMware image to the MCI
-# - Update the pointer to use the latest 14.04 Trusty Google image.
+# This package provides various MCI-related functions
 
 name "LIB - MCI Management"
 rs_ca_ver 20160622
@@ -39,6 +30,7 @@ define import_mci($pub_name) return @imported_item do
   call find_mci($pub_name) retrieve @imported_item
 end
 
+# Update an MCI to point to a new image for a given cloud.
 define mci_update_cloud_image(@mci, $cloud_href, $image_href) do
   # update the MCI setting to point to a given cloud image.
   @mci_settings = @mci.settings()

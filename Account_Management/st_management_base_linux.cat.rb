@@ -1,5 +1,5 @@
 # This CAT is used to create and manage a PFT Base Linux ServerTemplate
-# The intent is that this CAT is run in an account when an updated RL10.5.3 Base Linux ServerTemplate is available.
+# The intent is that this CAT is run in an account when an updated RL10 Base Linux ServerTemplate is available.
 
 # Basic Design:
 # - Delete the existing "PFT Base Linux ServerTemplate"
