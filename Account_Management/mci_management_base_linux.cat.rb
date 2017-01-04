@@ -21,15 +21,38 @@ This CAT is used to create/update/maintain the 'PFT Base Linux MCI' MCI used by 
 
 import "pft/mci"
 
+parameter "param_base_mci_name" do 
+  category "Inputs"
+  label "Name of MCI to use as a base" 
+  type "string" 
+  default "Ubuntu_14.04_x64"
+end
+
+parameter "param_base_google_image_name" do 
+  category "Inputs"
+  label "Name root for the image name in Google." 
+  type "string" 
+  default "ubuntu-1404-trusty-v"
+end
+
+# Currently not allowed to change this.
+parameter "param_pft_mci_name" do 
+  category "Inputs"
+  label "Name of the created/maintained PFT MCI." 
+  type "string" 
+  default "PFT Base Linux MCI"
+end
+
 operation "launch" do
   description "Manage the MCI"
   definition "manage_mci"
 end
 
-define manage_mci() do
+define manage_mci($param_base_mci_name, $param_base_google_image_name, $param_pft_mci_name) do
   
-  $base_linux_mci_name = "Ubuntu_14.04_x64"  # Name of the published MCI that we use at the base
-  $pft_base_linux_mci_name = "PFT Base Linux MCI" # Name of the MCI used by PFT assets.
+  $base_linux_mci_name = $param_base_mci_name  # Name of the published MCI that we use at the base
+  $pft_base_linux_mci_name = $param_pft_mci_name # Name of the MCI used by PFT assets.
+  $google_image_name_root = $param_base_google_image_name # base name for Google Ubuntu image
 
   # regardless of what happens below we want to get the latest version of the Ubuntu MCI that we use as the base for updating or creating the PFT Base Linux MCI
   call mci.import_mci($base_linux_mci_name) retrieve @base_linux_mci
@@ -54,7 +77,7 @@ define manage_mci() do
   
   # And then update the Google image in case the off-the-shelf base linux MCI was pointing to a deprecated image.
   # (Google is very quick to deprecated images.)
-  call update_google_image(@pft_base_mci)  
+  call update_google_image(@pft_base_mci, $google_image_name_root)  
   
 end
 
@@ -87,10 +110,10 @@ define update_vmware_image(@mci) do
   call mci.mci_update_cloud_image(@mci, $vmware_cloud_href, $vmware_image_href)
 end
 
-define update_google_image(@mci) do
+define update_google_image(@mci, $google_image_name_root) do
   # find the current google Ubuntu 14.04 image
   @cloud = rs_cm.clouds.get(filter: ["name==Google"])
-  @images = @cloud.images(filter: ["name==ubuntu-1404-trusty-v"])  # partial match is all we need
+  @images = @cloud.images(filter: ["name=="+$google_image_name_root])  # partial match is all we need
   @image = last(@images)  # just grab one of them should be ok - may have to do some better regexp matching
   $cloud_href = @cloud.href
   $image_href = @image.href

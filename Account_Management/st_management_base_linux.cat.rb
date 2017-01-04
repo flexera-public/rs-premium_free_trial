@@ -52,7 +52,7 @@ define manage_st($param_starting_st) do
   
   # If so, delete it so we can create a fresh on using the latest published RL10 ST
   if logic_not(empty?(@pft_base_linux_st))
-    @pft_base_linux_st.delete()
+    @pft_base_linux_st.destroy()
   end
   
   # Create a new ST based on the published ST
