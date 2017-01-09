@@ -32,6 +32,24 @@
       "metadata": {
         "description": "The Ubuntu version for the VM. This will pick a fully patched image of this given Ubuntu version."
       }
+    },
+    "refresh_token": {
+      "type": "securestring",
+      "metadata": {
+        "description": "RightScale refresh token to use for RL enablement."
+      }
+    },
+    "servertemplate_href": {
+      "type":"string",
+      "metadata":{
+        "description":"HREF for the ServerTemplate to use for RL enablement."
+      }
+    },
+    "deployment_href": {
+      "type":"string",
+      "metadata":{
+        "description":"HREF for the Deployment to use for RL enablement."
+      }
     }
   },
   "variables": {
