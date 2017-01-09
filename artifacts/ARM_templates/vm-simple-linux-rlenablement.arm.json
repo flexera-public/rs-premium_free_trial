@@ -193,7 +193,7 @@
                     "fileUris": [
                       "https://rightlink.rightscale.com/rll/10/rightlink.enable.sh"
                     ],
-                    "commandToExecute": "[concat('./rightlink.enable.sh -l -k \"', parameters('refresh_token'), '\" -r \"', parameters('servertemplate_href'), '\" -f \"', parameters('uca_name'), '\" -e \"', parameters('deployment_href'), '\" -n `hostname`')]"
+                    "commandToExecute": "[concat('./rightlink.enable.sh -l -k \"', parameters('refresh_token'), '\" -r \"', parameters('servertemplate_href'), '\" -c \"azure_v2\" -e \"', parameters('deployment_href'), '\" -n `hostname`')]"
                   },
                   "type": "CustomScript",
                   "typeHandlerVersion": "2.0",
