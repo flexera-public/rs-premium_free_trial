@@ -50,7 +50,7 @@
     "vmStorageAccountContainerName": "vhds",
     "vmName": "MyUbuntuVM",
     "vmSize": "Standard_A1",
-    "virtualNetworkName": "[concat('MyVNET', uniqueString(subscription().subscriptionId))]"
+    "virtualNetworkName": "[concat('MyVNET', uniqueString(subscription().subscriptionId))]",
     "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName'))]",
     "subnetRef": "[concat(variables('vnetID'),'/subnets/',variables('subnetName'))]"
   },
