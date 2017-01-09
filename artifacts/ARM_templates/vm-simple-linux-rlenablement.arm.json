@@ -50,7 +50,7 @@
     "vmStorageAccountContainerName": "vhds",
     "vmName": "MyUbuntuVM",
     "vmSize": "Standard_A1",
-    "virtualNetworkName": "MyVNET",
+    "virtualNetworkName": "[concat('MyVNET', uniqueString(subscription().subscriptionId))]"
     "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName'))]",
     "subnetRef": "[concat(variables('vnetID'),'/subnets/',variables('subnetName'))]"
   },
@@ -182,7 +182,26 @@
             "enabled": "true",
             "storageUri": "[concat(reference(concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName')), '2016-01-01').primaryEndpoints.blob)]"
           }
-        }
+        },
+       "extensionProfile": {
+            "extensions": [
+              {
+                "name": "customScript",
+                "properties": {
+                  "publisher": "Microsoft.Azure.Extensions",
+                  "settings": {
+                    "fileUris": [
+                      "https://rightlink.rightscale.com/rll/10/rightlink.enable.sh"
+                    ],
+                    "commandToExecute": "[concat('./rightlink.enable.sh -l -k \"', parameters('refresh_token'), '\" -r \"', parameters('servertemplate_href'), '\" -f \"', parameters('uca_name'), '\" -e \"', parameters('deployment_href'), '\" -n `hostname`')]"
+                  },
+                  "type": "CustomScript",
+                  "typeHandlerVersion": "2.0",
+                  "autoUpgradeMinorVersion": true
+                }
+              }
+            ]
+          }
       }
     }
   ],
