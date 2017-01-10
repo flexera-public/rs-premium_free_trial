@@ -88,7 +88,7 @@ end
 
 
 define find_st($st_name) return @desired_st do
-  # mci index is a partial match so it is possible more than one MCI will be returned
+  # name is a partial match so it is possible more than one ST will be returned
   @sts = rs_cm.server_templates.get(filter: ["name=="+$st_name])
   foreach @st in @sts do
     if @st.name == $st_name
