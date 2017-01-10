@@ -34,7 +34,11 @@ define setup_networks(@base_network) do
   
   # build an array of the cloud_hrefs for any existing networks of the given name.
   @current_pft_arm_networks = rs_cm.networks.get(filter: ["name==pft_arm_network"])
-  $current_pft_arm_network_cloud_hrefs = @current_pft_arm_networks.cloud().href[]
+  if size(@current_pft_arm_networks) == 0
+    $current_pft_arm_network_cloud_hrefs = []
+  else
+    $current_pft_arm_network_cloud_hrefs = @current_pft_arm_networks.cloud().href[]
+  end
       
   # Find the clouds attached to the account
   @arm_clouds = rs_cm.clouds.get(filter: ["name==AzureRM"])
