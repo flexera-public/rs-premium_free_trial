@@ -10,6 +10,6 @@
 #
 # INPUTS: the command line to pass to rightlink.enable.sh
 
-./rightlink.enable.sh $* | at now +1 minutes >/dev/null 2>&1 
+nohup ./rightlink.enable.sh $* &  
 
 exit 0
