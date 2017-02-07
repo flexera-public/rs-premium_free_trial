@@ -1,0 +1,164 @@
+Name: PFT Database Manager for MySQL for Chef Server (RightLink 10)
+Description: "Database Manager for MySQL 5.1/5.5 ServerTemplate for RightLink10 and
+  a Chef Server.   RightLink10 is a new agent to connect servers to the RightScale
+  platform that is very lightweight and simple to install.\r\n_It is not a plug-in
+  upgrade from the older RightLink v6 series._\r\nSee [http://docs.rightscale.com/rl/about.html](http://docs.rightscale.com/rl/about.html)
+  for details.\r\n\r\nThis ServerTemplate provides a high-availability master/slave
+  MySQL database configuration that can be used as the backbone for a variety of applications
+  and workloads. The MySQL version installed depends on the default package available
+  for the OS. CentOS 6.5 installs MySQL 5.1, and Ubuntu 12.04 installs MySQL 5.5.\r\n\r\n__
+  Requirements__\r\n\r\n * Chef Server or Hosted Chef\r\n* [ephemeral_lvm](https://github.com/rightscale-cookbooks/ephemeral_lvm)
+  ([2.0.0](https://github.com/rightscale-cookbooks/ephemeral_lvm/releases/tag/v2.0.0))\r\n*
+  [rightscale_volume](https://github.com/rightscale-cookbooks/rightscale_volume) ([2.0.0](https://github.com/rightscale-cookbooks/rightscale_volume/releases/tag/v2.0.0))\r\n*
+  [rightscale_backup](https://github.com/rightscale-cookbooks/rightscale_volume) ([2.0.0](https://github.com/rightscale-cookbooks/rightscale_backup/releases/tag/v2.0.0))\r\n*
+  [rightscale_tag](https://github.com/rightscale-cookbooks/rightscale_tag) ([2.0.0](https://github.com/rightscale-cookbooks/rightscale_tag/releases/tag/v2.0.0))\r\n*
+  [rs-mysql](https://github.com/rightscale-cookbooks/rs-mysql) ([2.0.0](https://github.com/rightscale-cookbooks/rs-mysql/releases/tag/v2.0.0))\r\n\r\n__Key
+  Features:__\r\n\r\n* Basic set of recipes for a RightLink-based server with logging,
+  monitoring, alerts, tagging, etc.\r\n* MultiCloud Images that reference the latest
+  supported images with a frozen and tested software repository date.\r\n* Basic set
+  of alerts for most server type monitoring.\r\n* Examples of system-required input
+  variables.\r\n\r\n__Documentation:__  \r\n\r\n* [Overview](http://docs.rightscale.com/st/rl10/mysql/overview.html)
+  \ \r\n* [Tutorial](http://docs.rightscale.com/st/rl10/mysql/tutorial.html)  \r\n\r\n*
+  * *\r\n\r\n__Tested Linux distros:__\r\n\r\n* Ubuntu 14.04 x86_64\r\n\r\n\r\n__Tested
+  compute clouds:__\r\n\r\n* AWS"
+Inputs:
+  APPLICATION_DATABASE_NAME: blank
+  APPLICATION_PASSWORD: blank
+  APPLICATION_USERNAME: blank
+  DB_BACKUP_LINEAGE: blank
+  CHEF_SERVER_SSL_CERT: blank
+  CHEF_SERVER_URL: blank
+  CHEF_VALIDATION_KEY: blank
+  CHEF_VALIDATION_NAME: blank
+  COLLECTD_SERVER: env:RS_TSS
+  DEVICE_IOPS: blank
+  DEVICE_VOLUME_SIZE: blank
+  DEVICE_VOLUME_TYPE: blank
+  DNS_MASTER_FQDN: blank
+  DNS_SECRET_KEY: blank
+  DNS_USER_KEY: blank
+  DB_RESTORE_LINEAGE: blank
+  DB_RESTORE_TIMESTAMP: blank
+  RS_INSTANCE_UUID: env:RS_INSTANCE_UUID
+  SCHEDULE_ENABLE: blank
+  SERVER_REPL_PASSWORD: blank
+  SERVER_ROOT_PASSWORD: blank
+  VERSION: text:12.16
+RightScripts:
+  Boot:
+  - Name: RL10 Linux Wait For EIP
+    Revision: 5
+    Publisher: RightScale
+  - Name: RL10 Linux Setup Hostname
+    Revision: 7
+    Publisher: RightScale
+  - Name: RL10 Linux Enable Managed Login
+    Revision: 10
+    Publisher: RightScale
+  - Name: RL10 Linux Setup Alerts
+    Revision: 1
+    Publisher: RightScale
+  - Name: RL10 Linux Setup Automatic Upgrade
+    Revision: 2
+    Publisher: RightScale
+  - Name: Chef Client Install
+    Revision: 5
+    Publisher: RS Professional Services
+  - Name: RS-Base Install - chef
+    Revision: 1
+    Publisher: RS Professional Services
+  - Name: Mysql Server Install - chef
+    Revision: 10
+    Publisher: RS Professional Services
+  - PFT_RL10_Dump_Import.sh
+  Decommission:
+  - Name: RL10 Linux Shutdown Reason
+    Revision: 4
+    Publisher: RightScale
+  - Name: Chef Client Delete Node
+    Revision: 5
+    Publisher: RS Professional Services
+  - Name: Mysql Server Decommission - chef
+    Revision: 5
+    Publisher: RS Professional Services
+  Operational:
+    - Name: Mysql Server Install - chef
+      Revision: 10
+      Publisher: RS Professional Services
+    - Name: Mysql Server Volume - chef
+      Revision: 6
+      Publisher: RS Professional Services
+    - Name: Mysql Server Stripe - chef
+      Revision: 6
+      Publisher: RS Professional Services
+    - Name: Mysql Server Master - chef
+      Revision: 9
+      Publisher: RS Professional Services
+    - Name: Mysql Server Slave - chef
+      Revision: 8
+      Publisher: RS Professional Services
+    - Name: Mysql Server Schedule - chef
+      Revision: 5
+      Publisher: RS Professional Services
+    - Name: Mysql Server Backup - chef
+      Revision: 7
+      Publisher: RS Professional Services
+    - Name: RL10 Linux Setup Automatic Upgrade
+      Revision: 2
+      Publisher: RightScale
+    - Name: RL10 Linux Upgrade
+      Revision: 6
+      Publisher: RightScale
+MultiCloudImages:
+  - Name: PFT Base Linux MCI
+Alerts:
+  - Name: instance terminated
+    Description: Raises alert if instance terminates abnormally, i.e., not through the
+      RightScale interface or by an elasticity daemon (only for server arrays).
+    Clause: If RS/server.state == terminated for 1 minutes Then escalate critical
+  - Name: instance stranded
+    Description: Raises alert if instance enters the stranded state.
+    Clause: If RS/server-failure.state == stranded for 1 minutes Then escalate warning
+  - Name: instance not responding
+    Description: Raises alert if instance fails to send monitoring information within
+      a given duration, based on the conditions set for this alert.
+    Clause: If cpu-0/cpu-idle.value == NaN for 30 minutes Then escalate warning
+  - Name: cpu busy
+    Description: Raises alert if average idle time is too low, based on the conditions
+      set for this alert.
+    Clause: If cpu-0/cpu-idle.value < 15 for 60 minutes Then escalate warning
+  - Name: cpu overloaded
+    Description: Raises alert if average idle time is too low, based on the conditions
+      set for this alert.
+    Clause: If cpu-0/cpu-idle.value < 3 for 30 minutes Then escalate critical
+  - Name: cpu I/O wait
+    Description: Raises alert if average disk I/O is too high, based on the conditions
+      set for this alert.
+    Clause: If cpu-0/cpu-wait.value > 40 for 30 minutes Then escalate warning
+  - Name: high network rx activity
+    Clause: If interface-eth0/if_octets.rx > 50000000 for 30 minutes Then escalate critical
+  - Name: 'high network tx activity '
+    Clause: If interface-eth0/if_octets.tx > 50000000 for 30 minutes Then escalate critical
+  - Name: low space in root partition
+    Description: Escalates to Critical Alert if space drops below 1G
+    Clause: If df-root/df_complex-free.value < 1000000000 for 5 minutes Then escalate
+      critical
+  - Name: low space in mnt storage partition
+    Description: Critically Alerts if /mnt/storage drops below 1G
+    Clause: If df-mnt-storage/df_complex-free.value < 1000000000 for 5 minutes Then
+      escalate critical
+  - Name: mysqld process dead
+    Description: Alerts if mysql process goes to 0
+    Clause: If processes-mysqld/ps_count.processes < 1 for 1 minutes Then escalate critical
+  - Name: MySQL Slave 30 Seconds Behind Master
+    Description: Will alert if slave is 30 seconds behind master for 5 minutes
+    Clause: If mysql_seconds_behind_master/gauge-seconds.value > 30 for 5 minutes Then
+      escalate warning
+  - Name: MySQL Slave 60 Seconds Behind Master
+    Description: Will alert critical if slave falls 60 seconds behind master
+    Clause: If mysql_seconds_behind_master/gauge-seconds.value >= 60 for 5 minutes Then
+      escalate critical
+  - Name: MySQL Slave Threads are down
+    Description: Will alert if mysql slave threads are down
+    Clause: If mysql_slave_running/gauge-operations.value != 2 for 2 minutes Then escalate
+      critical

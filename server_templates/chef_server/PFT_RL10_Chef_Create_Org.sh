@@ -1,9 +1,8 @@
 #! /usr/bin/sudo /bin/bash
 # ---
 # RightScript Name: PFT RL10 Chef Create Org
-# Description: Creates a new organization on a chef server using
-#   chef-server-ctl, as described at ->
-#   (https://docs.chef.io/install_server.html#standalone)
+# Description: Creates a new organization on a chef server using chef-server-ctl, as
+#   described at -> (https://docs.chef.io/install_server.html#standalone)
 # Inputs:
 #   CHEF_ADMIN_USERNAME:
 #     Category: CHEF

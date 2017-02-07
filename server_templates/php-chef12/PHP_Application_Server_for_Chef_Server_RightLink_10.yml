@@ -1,0 +1,136 @@
+Name: PFT PHP Application Server for Chef Server (RightLink 10)
+Description: "PHP Application Server for Chef Server (RightLink 10) ServerTemplate.
+  \  RightLink10 is a new agent to connect servers to the RightScale platform that
+  is very lightweight and simple to install.\r\n_It is not a plug-in upgrade from
+  the older RightLink v6 series._\r\nSee [http://docs.rightscale.com/rl/about.html](http://docs.rightscale.com/rl/about.html)
+  for details.\r\n\r\nIn addition to installing PHP, this ServerTemplate runs a script
+  to update the packaging system and enable automatic security updates, and a collectd
+  install script to enable RightScale monitoring. \r\n\r\nThe ServerTemplate can run
+  on most any Linux distro that supports cloud-init. It is recommended to use the
+  standard distro images in various clouds.\r\n\r\n__ Requirements__\r\n\r\n * Chef
+  Server or Hosted Chef\r\n * [rs-application_php](https://github.com/rightscale-cookbooks/rs-application_php)
+  ([2.0.0](https://github.com/rightscale-cookbooks/rs-application_php/releases/tag/v2.0.0))\r\n
+  * [rsc_remote_recipe](https://github.com/rightscale-services-cookbooks/rsc_remote_recipe)
+  ([10.1.0](https://github.com/rightscale-services-cookbooks/rsc_remote_recipe/releases/tag/v10.1.0))\r\n\r\n__Key
+  Features:__\r\n\r\n* Sets up and launches a PHP application server in any of the
+  supported cloud infrastructures.\r\n* Connections to a MySQL database.\r\n* Includes
+  predefined alerts for monitoring Apache.\r\n* Attach/Detach application servers
+  to a HAProxy load balancer.\r\n* Basic set of recipes for a RightLink-based server
+  with logging, monitoring, alerts, tagging, etc.\r\n* MultiCloud Images that reference
+  the latest supported images with a frozen and tested software repository date.\r\n*
+  Basic set of alerts for most server type monitoring.\r\n* Examples of system-required
+  input variables.\r\n\r\n\r\n__Documentation:__  \r\n\r\n* [Overview](http://docs.rightscale.com/st/rl10/php/overview.html)\r\n*
+  [Tutorial](http://docs.rightscale.com/st/rl10/php/tutorial.html)\r\n\r\n* * *\r\n\r\n__Tested
+  Linux distros:__\r\n\r\n* Ubuntu 14.04 x86_64\r\n\r\n\r\n__Tested compute clouds:__\r\n\r\n*
+  AWS"
+Inputs:
+  APPLICATION_NAME: blank
+  APPLICATION_ROOT_PATH: blank
+  CHEF_SERVER_SSL_CERT: blank
+  CHEF_SERVER_URL: blank
+  CHEF_VALIDATION_KEY: blank
+  CHEF_VALIDATION_NAME: blank
+  VERSION: text:12.16
+  COLLECTD_SERVER: env:RS_TSS
+  DATABASE_HOST: blank
+  DATABASE_PASSWORD: blank
+  DATABASE_SCHEMA: blank
+  DATABASE_USER: blank
+  MIGRATION_COMMAND: blank
+  PACKAGES: blank
+  REFRESH_TOKEN: blank
+  RS_INSTANCE_UUID: env:RS_INSTANCE_UUID
+  SCM_DEPLOY_KEY: blank
+  SCM_REPOSITORY: blank
+  SCM_REVISION: blank
+RightScripts:
+  Boot:
+  - Name: RL10 Linux Wait For EIP
+    Revision: 5
+    Publisher: RightScale
+  - Name: RL10 Linux Setup Hostname
+    Revision: 7
+    Publisher: RightScale
+  - Name: RL10 Linux Enable Managed Login
+    Revision: 10
+    Publisher: RightScale
+  - Name: RL10 Linux Setup Alerts
+    Revision: 1
+    Publisher: RightScale
+  - Name: RL10 Linux Setup Automatic Upgrade
+    Revision: 2
+    Publisher: RightScale
+  - Name: Chef Client Install
+    Revision: 5
+    Publisher: RS Professional Services
+  - Name: RS-Base Install - chef
+    Revision: 1
+    Publisher: RS Professional Services
+  - PHP_Appserver_Install-chef
+  - PHP_Appserver_Application_Backend-chef
+  Decommission:
+  - Name: RL10 Linux Shutdown Reason
+    Revision: 4
+    Publisher: RightScale
+  - Name: Chef Client Delete Node
+    Revision: 5
+    Publisher: RS Professional Services
+  - PHP_Appserver_Application_Backend_Detach-chef
+  Operational:
+  - PHP_Appserver_Application_Backend-chef
+  - PHP_Appserver_Application_Backend_Detach-chef
+  - Name: RL10 Linux Setup Automatic Upgrade
+    Revision: 2
+    Publisher: RightScale
+  - Name: RL10 Linux Upgrade
+    Revision: 6
+    Publisher: RightScale
+MultiCloudImages:
+  - Name: PFT Base Linux MCI
+Alerts:
+  - Name: rs instance terminated
+    Description: Raise an alert if the instance has been terminated abnormally, i.e.
+      not through the RightScale interface or by an elasticity daemon resizing server
+      arrays.
+    Clause: If RS/server.state == terminated for 1 minutes Then escalate critical
+  - Name: rs instance stranded
+    Description: Raise an alert if the instance enters the stranded state.
+    Clause: If RS/server-failure.state == stranded for 1 minutes Then escalate warning
+  - Name: rs instance not responding
+    Description: Raise an alert if the instance fails to send monitoring information
+      for 5 minutes.
+    Clause: If cpu-0/cpu-idle.value == NaN for 5 minutes Then escalate critical
+  - Name: rs cpu busy
+    Description: Raise an alert if the idle time is too low.
+    Clause: If cpu-0/cpu-idle.value < 15 for 3 minutes Then escalate warning
+  - Name: rs cpu overloaded
+    Description: Raise an alert when the cpu idle time is too low.
+    Clause: If cpu-0/cpu-idle.value < 3 for 5 minutes Then escalate critical
+  - Name: rs cpu I/O wait
+    Description: Raise an alert if disk io is too high.
+    Clause: If cpu-0/cpu-wait.value > 40 for 15 minutes Then escalate warning
+  - Name: rs low space in root partition
+    Description: Raise an alert if the available space in the root partition is too low. This alert may be modified on
+      an instance to match the metric name df/df-root.free instead if the instance is running collectd 4. See the RL10
+      Linux Setup Alerts RightScript (rll/setup-alerts.sh) for more details.
+    Clause: If df-root/df_complex-free.value < 1073741824 for 5 minutes Then escalate critical
+  - Name: rs high network tx activity
+    Description: Raise an alert if the amount of network data transmitted is too high. This alert may be modified or
+      cloned on an instance to match the actual network interfaces that are present. See the RL10 Linux Setup Alerts
+      RightScript (rll/setup-alerts.sh) for more details.
+    Clause: If interface-eth0/if_octets.tx > 10000000 for 10 minutes Then escalate critical
+  - Name: rs high network rx activity
+    Description: Raise an alert if the amount of network data received is too high. This alert may be modified or cloned
+      on an instance to match the actual network interfaces that are present. See the RL10 Linux Setup Alerts
+      RightScript (rll/setup-alerts.sh) for more details.
+    Clause: If interface-eth0/if_octets.rx > 50000000 for 30 minutes Then escalate critical
+  - Name: rs low swap space
+    Description: Raise alert if the free swap space is too low. This alert may be removed from an instance if swap is
+      not enabled. See the RL10 Linux Setup Alerts RightScript (rll/setup-alerts.sh) for more details.
+    Clause: If swap/swap-free.value < 104857600 for 5 minutes Then escalate critical
+  - Name: rs memory low
+    Description: Raise an alert if free memory is too low.
+    Clause: If memory/memory-free.value < 1000000 for 1 minutes Then escalate critical
+  - Name: rs out of memory
+    Description: Raise an alert when the server is out of free memory.
+    Clause: If memory/memory-free.value == 0 for 1 minutes Then escalate critical

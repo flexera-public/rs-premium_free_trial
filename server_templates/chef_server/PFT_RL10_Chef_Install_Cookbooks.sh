@@ -45,10 +45,15 @@ cat > berkshelf.json << EOF
 EOF
 git clone https://github.com/rightscale-cookbooks/rs-haproxy.git
 cd /tmp/rs-haproxy
-git checkout v1.2.3
-berks install && berks upload -c /tmp/berkshelf.json
+git checkout v1.2.4
+berks install --except integration test && berks upload --except integration test -c /tmp/berkshelf.json
 
 git clone https://github.com/rightscale-cookbooks/rs-mysql.git /tmp/rs-mysql
 cd /tmp/rs-mysql
-git checkout v1.2.5
+git checkout v2.0.1
+berks install && berks upload -c /tmp/berkshelf.json
+
+git clone https://github.com/rightscale-cookbooks/rs-application_php.git /tmp/rs-application_php
+cd /tmp/rs-application_php
+git checkout chef-12-azure-rm-support
 berks install && berks upload -c /tmp/berkshelf.json

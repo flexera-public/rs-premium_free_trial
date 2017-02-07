@@ -1,0 +1,211 @@
+#! /usr/bin/sudo /bin/bash
+# ---
+# RightScript Name: PHP Appserver Install - chef
+# Description: 'Installs/configures PHP application server '
+# Inputs:
+#   APPLICATION_ROOT_PATH:
+#     Category: Application
+#     Description: 'The path of application root relative to /usr/local/www/sites/<application
+#       name> directory. Example: my_app'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   APPLICATION_NAME:
+#     Category: Application
+#     Description: 'The name of the application. This name is used to generate the path
+#       of the application code and to determine the backend pool in a load balancer
+#       server that the application server will be attached to. Application names can
+#       have only alphanumeric characters and underscores. Example: hello_world'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_HOST:
+#     Category: Application
+#     Description: 'The FQDN of the database server. Example: db.example.com'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_SCHEMA:
+#     Category: Application
+#     Description: 'The password used to connect to the database. Example: cred:MYSQL_APPLICATION_PASSWORD'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_USER:
+#     Category: Application
+#     Description: 'The username used to connect to the database. Example: cred:MYSQL_APPLICATION_USERNAME'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   LISTEN_PORT:
+#     Category: Application
+#     Description: 'The port to use for the application to bind. Example: 8080'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#     Default: text:8080
+#   MIGRATION_COMMAND:
+#     Category: Application
+#     Description: 'The command used to perform application migration. Example: php
+#       app/console doctrine:migrations:migrate'
+#     Input Type: single
+#     Required: false
+#     Advanced: false
+#   SCM_DEPLOY_KEY:
+#     Category: Application
+#     Description: 'The private key to access the repository via SSH. Example: Cred:APP_DEPLOY_KEY'
+#     Input Type: single
+#     Required: false
+#     Advanced: false
+#   SCM_REPOSITORY:
+#     Category: Application
+#     Description: 'The repository location to download application code. Example: git://github.com/rightscale/examples.git'
+#     Input Type: single
+#     Required: false
+#     Advanced: false
+#   SCM_REVISION:
+#     Category: Application
+#     Description: 'The revision of application code to download from the repository.
+#       Example: 37741af646ca4181972902432859c1c3857de742'
+#     Input Type: single
+#     Required: false
+#     Advanced: false
+#   BIND_NETWORK_INTERFACE:
+#     Category: Application
+#     Description: The network interface to use for the bind address of the application
+#       server. It can be either 'private' or 'public' interface.
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#     Default: text:private
+#     Possible Values:
+#     - text:private
+#     - text:public
+#   VHOST_PATH:
+#     Category: Application
+#     Description: 'The virtual host served by the application server. The virtual host
+#       name can be a valid domain/path name supported by the access control lists (ACLs)
+#       in a load balancer. Ensure that no two application servers in the same deployment
+#       having the same application name have different vhost paths. Example: http:://www.example.com,
+#       /index'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#     Default: text:/
+#   REFRESH_TOKEN:
+#     Category: Application
+#     Description: 'The Rightscale OAUTH refresh token.  Example: cred: MY_REFRESH_TOKEN'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_PASSWORD:
+#     Category: Application
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   PACKAGES:
+#     Category: Application
+#     Description: 'List of additional PHP packages to be installed before starting
+#       the deployment. Package versions can be specified. Example: pkg1, pkg2=2.0'
+#     Input Type: single
+#     Required: false
+#     Advanced: false
+#   ALLOW_OVERRIDE:
+#     Category: Application
+#     Description: set apache allow_override
+#     Input Type: single
+#     Required: false
+#     Advanced: false
+#     Default: text:None
+#     Possible Values:
+#     - text:All
+#     - text:None
+# Attachments: []
+# ...
+
+set -e
+
+HOME=/home/rightscale
+export PATH=${PATH}:/usr/local/sbin:/usr/local/bin
+
+/sbin/mkhomedir_helper rightlink
+
+export chef_dir=$HOME/.chef
+mkdir -p $chef_dir
+
+#convert input array to array for json in chef.json below
+packages_array=$(echo $PACKAGES | sed -e 's/,/ /g')
+packages_array=$(echo $packages_array | sed -e 's/\(\w*\)/,"\1"/g' | cut -d , -f 2-)
+
+packages_array=''
+if [ -n "$packages_array" ];then
+  packages_array="\"packages\":[$packages_array]"
+fi
+
+#get instance data to pass to chef server
+instance_data=$(rsc --rl10 cm15 index_instance_session  /api/sessions/instance)
+instance_uuid=$(echo $instance_data | rsc --x1 '.monitoring_id' json)
+instance_id=$(echo $instance_data | rsc --x1 '.resource_uid' json)
+monitoring_server=$(echo $instance_data | rsc --x1 '.monitoring_server' json)
+shard=$(echo $monitoring_server | sed -e 's/tss/us-/')
+
+deploy_key=''
+if [ -n "$SCM_DEPLOY_KEY" ];then
+cat <<EOF>/tmp/deploy_key
+$SCM_DEPLOY_KEY
+EOF
+  deploy_key_output="$(cat /tmp/deploy_key | awk 1 ORS='\\n')"
+  deploy_key="\"deploy_key\":\"${deploy_key_output}\","
+fi
+rm -rf /tmp/deploy_key
+
+if [ -e $chef_dir/chef.json ]; then
+  rm -f $chef_dir/chef.json
+fi
+
+# add the rightscale env variables to the chef runtime attributes
+# http://docs.rightscale.com/cm/ref/environment_inputs.html
+cat <<EOF> $chef_dir/chef.json
+{
+  "name": "${HOSTNAME}",
+  "normal": {
+    "tags": []
+  },
+  "rightscale": {
+    "instance_uuid":"$instance_uuid",
+    "instance_id":"$instance_id",
+    "refresh_token":"$REFRESH_TOKEN",
+    "api_url":"https://${shard}.rightscale.com"
+  },
+  "rs-application_php": {
+    "allow_override": "$ALLOW_OVERRIDE",
+    "app_root": "$APPLICATION_ROOT_PATH",
+    "application_name": "$APPLICATION_NAME",
+    "bind_network_interface": "$BIND_NETWORK_INTERFACE",
+    "listen_port": "$LISTEN_PORT",
+    "vhost_path":"$VHOST_PATH",
+    "migration_command": "$MIGRATION_COMMAND",
+    $packages_array
+    "scm": {
+      $deploy_key
+      "repository": "$SCM_REPOSITORY",
+      "revision": "$SCM_REVISION"
+    },
+    "database": {
+      "host": "$DATABASE_HOST",
+      "password": "$DATABASE_PASSWORD",
+      "schema": "$DATABASE_SCHEMA",
+      "user": "$DATABASE_USER"
+    },
+    "write_settings_file": true,
+    "settings_template": "db.php.erb"
+  },
+  "run_list": ["recipe[rs-application_php]", "recipe[rs-application_php::tags]",
+  "recipe[rs-application_php::collectd]"]
+}
+EOF
+
+
+chef-client -j $chef_dir/chef.json
+rm /usr/local/www/sites/pft/current/config/db.php
+ln -sf /usr/local/www/sites/pft/shared/db.php /usr/local/www/sites/pft/current/config/db.php
