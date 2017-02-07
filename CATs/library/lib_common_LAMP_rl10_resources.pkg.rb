@@ -143,7 +143,7 @@ resource 'app_server', type: 'server_array' do
     'CHEF_VALIDATION_KEY' => join(['cred:PFT-LAMP-ChefValidator-',last(split(@@deployment.href,"/"))]),
     'CHEF_VALIDATION_NAME' => 'text:pft-validator',
     'CHEF_SSL_VERIFY_MODE' => 'text::verify_none',
-    'DATABASE_HOST' => join(['env:Db-',last(split(@@deployment.href,"/")),':PRIVATE_IP']),
+    'DATABASE_HOST' => join(['env:DB-',last(split(@@deployment.href,"/")),':PRIVATE_IP']),
     'DATABASE_PASSWORD' => 'cred:CAT_MYSQL_APP_PASSWORD',
     'DATABASE_SCHEMA' => 'text:app_test',
     'DATABASE_USER' => 'cred:CAT_MYSQL_APP_USERNAME',
