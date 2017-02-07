@@ -4,7 +4,7 @@ short_description "RCL definitions and resources for working with ServerTemplate
 
 package "pft/server_templates_utilities"
 
-import "pft/err_utilities"
+import "pft/err_utilities", as: "err"
 
 permission "import_servertemplates" do
   actions   "rs_cm.import"
@@ -22,33 +22,33 @@ define importServerTemplate($stmap) do
   end
 end
 
-# Runs a rightscript without specified inputs on the given target node 
+# Runs a rightscript without specified inputs on the given target node
 define run_script_no_inputs(@target, $script_name) do
   @script = rs_cm.right_scripts.get(latest_only: true, filter: [ join(["name==",$script_name]) ])
   $right_script_href=@script.href
-  
+
   call get_instance_collection(@target) retrieve @target_instances
 
   @task = @target_instances.run_executable(right_script_href: $right_script_href)
   if @task.summary =~ "failed"
     raise "Failed to run " + $script_name + " on server, " + @target.href
-  end 
+  end
 end
 
-# Runs a rightscript without specified inputs on the given target node 
+# Runs a rightscript without specified inputs on the given target node
 define run_script_inputs(@target, $script_name, $script_inputs) do
   @script = rs_cm.right_scripts.get(latest_only: true, filter: [ join(["name==",$script_name]) ])
   $right_script_href=@script.href
-  
+
   call get_instance_collection(@target) retrieve @target_instances
 
   @task = @target_instances.run_executable(right_script_href: $right_script_href, inputs: $script_inputs)
   if @task.summary =~ "failed"
     raise "Failed to run " + $script_name + " on server, " + @target.href
-  end 
+  end
 end
 
-# Runs a recipe with no inputs on the given target node 
+# Runs a recipe with no inputs on the given target node
 define run_recipe_no_inputs(@target, $recipe_name) do
 
   call get_instance_collection(@target) retrieve @target_instances
@@ -60,11 +60,11 @@ define run_recipe_no_inputs(@target, $recipe_name) do
   end
 end
 
-# Runs a recipe with specified inputs on the given target node 
+# Runs a recipe with specified inputs on the given target node
 define run_recipe_inputs(@target, $recipe_name, $recipe_inputs) do
-  
+
   call get_instance_collection(@target) retrieve @target_instances
-  
+
   @task = @target_instances.run_executable(recipe_name: $recipe_name, inputs: $recipe_inputs)
   sleep_until(@task.summary =~ "^(completed|failed)")
   if @task.summary =~ "failed"

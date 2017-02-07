@@ -28,18 +28,18 @@ short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/lamp_icon.p
 
 Launches a 3-tier LAMP stack."
 long_description "Launches a 3-tier LAMP stack.\n
-Clouds Supported: <B>AWS, Azure</B>"
+Clouds Supported: <B>AWS, AzureRM, Google, VMware</B>"
 
 import "pft/parameters"
-import "pft/lamp_parameters"
+import "pft/rl10/lamp_parameters", as: "lamp_parameters"
 import "pft/mappings"
-import "pft/lamp_mappings"
+import "pft/rl10/lamp_mappings", as: "lamp_mappings"
 import "pft/conditions"
 import "pft/resources"
-import "pft/lamp_resources"
+import "pft/rl10/lamp_resources", as: "lamp_resources"
 import "pft/server_templates_utilities"
 import "pft/server_array_utilities"
-import "pft/lamp_utilities"
+import "pft/rl10/lamp_utilities", as: "lamp_utilities"
 
 ##################
 # User inputs    #
@@ -55,6 +55,11 @@ end
 parameter "param_appcode" do
   like $lamp_parameters.param_appcode
   operations "update_app_code"
+end
+
+parameter "param_chef_password" do
+  like $lamp_parameters.param_chef_password
+  operations "launch"
 end
 
 
@@ -144,31 +149,7 @@ end
 
 ### Server Declarations ###
 resource 'chef_server', type: 'server' do
-  name join(['Chef-',last(split(@@deployment.href,"/"))])
-  cloud map( $map_cloud, $param_location, "cloud" )
-  datacenter map($map_cloud, $param_location, "zone")
-  instance_type map($map_cloud, $param_location, "instance_type")
-  ssh_key_href map($map_cloud, $param_location, "ssh_key")
-  placement_group_href map($map_cloud, $param_location, "pg")
-  security_group_hrefs map($map_cloud, $param_location, "sg")
-  #server_template find(map($map_st, "lb", "name"), revision: map($map_st, "lb", "rev"))
-  server_template_href '/api/server_templates/389019003'
-  #multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
-  multi_cloud_image_href '/api/multi_cloud_images/421984003'
-  inputs do {
-    'LOG_LEVEL' => 'text:info',
-    'EMAIL_FROM_ADDRESS' => 'text:pft@rightscale.com',
-    'CHEF_NOTIFICATON_EMAIL' => 'text:ryan@rightscale.com',
-    'CHEF_SERVER_FQDN' => 'env:PUBLIC_IP', # Maybe private is better? Maybe we do some DNS here?
-    'CHEF_SERVER_VERSION' => 'text:12.11.1',
-    'COOKBOOK_VERSION' => 'text:v1.0.3',
-    'CHEF_ORG_NAME' => 'text:pft',
-    'CHEF_ADMIN_EMAIL' => 'text:ryan@rightscale.com',
-    'CHEF_ADMIN_FIRST_NAME' => 'text:Ryan',
-    'CHEF_ADMIN_LAST_NAME' => 'text:Geyer',
-    'CHEF_ADMIN_USERNAME' => 'text:rgeyer',
-    'CHEF_ADMIN_PASSWORD' => 'text:default-pass'
-  } end
+  like @lamp_resources.chef_server
 end
 
 resource 'lb_server', type: 'server' do
@@ -188,18 +169,12 @@ resource "sec_group", type: "security_group" do
   like @lamp_resources.sec_group
 end
 
+resource "sec_group_rule_ssh", type: "security_group_rule" do
+  like @lamp_resources.sec_group_rule_ssh
+end
+
 resource "sec_group_rule_https", type: "security_group_rule" do
-  name "CAT HTTP Rule"
-  description "Allow HTTPS access."
-  source_type "cidr_ips"
-  security_group @lamp_resources.sec_group
-  protocol "tcp"
-  direction "ingress"
-  cidr_ips "0.0.0.0/0"
-  protocol_details do {
-    "start_port" => "443",
-    "end_port" => "443"
-  } end
+  like @lamp_resources.sec_group_rule_https
 end
 
 resource "sec_group_rule_http", type: "security_group_rule" do
@@ -234,18 +209,18 @@ end
 ####################
 # OPERATIONS       #
 ####################
-# operation "launch" do
-#   description "Concurrently launch the servers"
-#   definition "lamp_utilities.launcher"
-#   output_mappings do {
-#     $site_url => $site_link,
-#     $lb_status => $lb_status_link,
-#   } end
-# end
-
 operation "launch" do
-  description "test"
-  definition "launch"
+  description "Concurrently launch the servers"
+  definition "lamp_utilities.launcher"
+  output_mappings do {
+    $site_url => $site_link,
+    $lb_status => $lb_status_link,
+  } end
+end
+
+operation "terminate" do
+  description "Clean up a few unique items"
+  definition "lamp_utilities.delete_resources"
 end
 
 operation "update_app_code" do
@@ -264,31 +239,4 @@ operation "scale_in" do
   label "Scale In"
   description "Scales in an application tier server."
   definition "server_array_utilities.scale_in_array"
-end
-
-define launch(@ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, @chef_server, @app_server, @lb_server, @db_server, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup) return @chef_server, @app_server, @lb_server, @db_server do
-  if $needsSshKey
-    provision(@ssh_key)
-  end
-
-  # Provision the security group rules if applicable. (The security group itself is created when the server is provisioned.)
-  if $needsSecurityGroup
-    provision(@sec_group_rule_http)
-    provision(@sec_group_rule_http8080)
-    provision(@sec_group_rule_mysql)
-  end
-
-  # Provision the placement group if applicable
-  if $needsPlacementGroup
-      provision(@placement_group)
-  end
-
-  provision(@chef_server)
-  $key = gsub(gsub(tag_value(@chef_server.current_instance(), 'chef_org_validator:pft'), ',', '\n'), 'eq;', '=')
-  $credname = 'PFT-LAMP-ChefValidator-'+last(split(@@deployment.href,"/"))
-  rs_cm.credentials.create(credential: {name: $credname, value: $key})
-
-  $cert = gsub(gsub(tag_value(@chef_server.current_instance(), 'chef_server:ssl_cert'), ',', '\n'), 'eq;', '=')
-  $credname = 'PFT-LAMP-ChefCert-'+last(split(@@deployment.href,"/"))
-  rs_cm.credentials.create(credential: {name: $credname, value: $cert})
 end
