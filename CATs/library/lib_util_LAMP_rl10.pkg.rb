@@ -11,7 +11,7 @@ import "pft/rl10/lamp_resources"
 import "pft/err_utilities", as: "functions"
 
 
-define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
+define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
 
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -26,12 +26,12 @@ define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @se
 
   call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
 
-  call launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  retrieve @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link
+  call launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  retrieve @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link
 
 end
 
 
-define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
+define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
 
   # Provision the resources
 
@@ -42,6 +42,7 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
 
   # Provision the security group rules if applicable. (The security group itself is created when the server is provisioned.)
   if $needsSecurityGroup
+    provision(@sec_group_rule_ssh)
     provision(@sec_group_rule_http)
     provision(@sec_group_rule_https)
     provision(@sec_group_rule_http8080)
