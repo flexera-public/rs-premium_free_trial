@@ -85,3 +85,14 @@ define get_instance_collection(@target) return @target_instances do
     call err.log("get_instance_collection: Unrecognized target type: "+to_s($target_type), to_s(@target))
   end
 end
+
+
+define find_st($st_name) return @desired_st do
+  # name is a partial match so it is possible more than one ST will be returned
+  @sts = rs_cm.server_templates.get(filter: ["name=="+$st_name])
+  foreach @st in @sts do
+    if @st.name == $st_name
+      @desired_st = @st
+    end
+  end
+end

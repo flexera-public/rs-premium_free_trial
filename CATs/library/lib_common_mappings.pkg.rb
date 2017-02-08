@@ -12,6 +12,8 @@ mapping "map_cloud" do {
     "sg" => '@sec_group',  
     "ssh_key" => "@ssh_key",
     "pg" => null,
+    "network" => null,
+    "subnet" => null,
     "mci_mapping" => "Public",
   },
   "Azure" => {   
@@ -21,6 +23,19 @@ mapping "map_cloud" do {
     "sg" => null, 
     "ssh_key" => null,
     "pg" => "@placement_group",
+    "network" => null,
+    "subnet" => null,
+    "mci_mapping" => "Public",
+  },
+  "AzureRM" => {   
+    "cloud" => "AzureRM East US",
+    "zone" => null,
+    "instance_type" => "D1",
+    "sg" =>  "@sec_group", 
+    "ssh_key" => null,
+    "pg" => null,
+    "network" => "pft_arm_network",
+    "subnet" => "default",
     "mci_mapping" => "Public",
   },
   "Google" => {
@@ -30,6 +45,8 @@ mapping "map_cloud" do {
     "sg" => '@sec_group',  
     "ssh_key" => null,
     "pg" => null,
+    "network" => null,
+    "subnet" => null,
     "mci_mapping" => "Public",
   },
   "VMware" => {
@@ -39,6 +56,8 @@ mapping "map_cloud" do {
     "sg" => null, 
     "ssh_key" => "@ssh_key",
     "pg" => null,
+    "network" => null,
+    "subnet" => null,
     "mci_mapping" => "VMware",
   }
 }
@@ -48,12 +67,14 @@ mapping "map_instancetype" do {
   "Standard Performance" => {
     "AWS" => "m3.medium",
     "Azure" => "D1",
+    "AzureRM" => "D1",
     "Google" => "n1-standard-1",
-    "VMware" => "medium",
+    "VMware" => "small",
   },
   "High Performance" => {
     "AWS" => "m3.large",
     "Azure" => "D2",
+    "AzureRM" => "D1",
     "Google" => "n1-standard-2",
     "VMware" => "large",
   }
