@@ -55,5 +55,5 @@ berks install && berks upload -c /tmp/berkshelf.json
 
 git clone https://github.com/rightscale-cookbooks/rs-application_php.git /tmp/rs-application_php
 cd /tmp/rs-application_php
-git checkout chef-12-azure-rm-support
+git checkout v2.0.1
 berks install && berks upload -c /tmp/berkshelf.json
