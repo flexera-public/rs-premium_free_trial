@@ -93,30 +93,35 @@ define create_pft_base_linux_mci($mci_name, @base_mci) return @mci do
   @mci.settings().create(multi_cloud_image_setting: {cloud_href: $vmware_cloud_href, image_href: $vmware_image_href, instance_type_href: $vmware_instance_type_href})
 end
  
-define get_vmware_cloud_elements() return $cloud_href, $image_href, $instance_type_href do
+define get_vmware_cloud_elements(@vmware_cloud) return $cloud_href, $image_href, $instance_type_href do
   # Need to add the VMware image to this newly created MCI.
-  @cloud = rs_cm.clouds.get(filter: ["name==VMware Private Cloud"])
-  @image = @cloud.images(filter: ["name==PFT_Ubuntu_vmware"])
-  @instance_type = @cloud.instance_types(filter: ["name==small"])
+  @image = @vmware_cloud.images(filter: ["name==PFT_Ubuntu_vmware"])
+  @instance_type = @vmware_cloud.instance_types(filter: ["name==small"])
   
-  $cloud_href = @cloud.href
+  $cloud_href = @vmware_cloud.href
   $image_href = @image.href
   $instance_type_href = @instance_type.href
 end
 
 define update_vmware_image(@mci) do
-  # Get the vmware cloud related items
-  call get_vmware_cloud_elements() retrieve $vmware_cloud_href, $vmware_image_href, $vmware_instance_type_href
-  call mci.mci_update_cloud_image(@mci, $vmware_cloud_href, $vmware_image_href)
+  @cloud = rs_cm.clouds.get(filter: ["name==VMware Private Cloud"])
+  if (size(@cloud) > 0)
+    # Get the vmware cloud related items
+    call get_vmware_cloud_elements(@cloud) retrieve $vmware_cloud_href, $vmware_image_href, $vmware_instance_type_href
+    call mci.mci_update_cloud_image(@mci, $vmware_cloud_href, $vmware_image_href)
+  end
 end
 
 define update_google_image(@mci, $google_image_name_root) do
   # find the current google Ubuntu 14.04 image
   @cloud = rs_cm.clouds.get(filter: ["name==Google"])
-  @images = @cloud.images(filter: ["name=="+$google_image_name_root])  # partial match is all we need
-  @image = last(@images)  # just grab one of them should be ok - may have to do some better regexp matching
-  $cloud_href = @cloud.href
-  $image_href = @image.href
+    
+  if (size(@cloud) > 0)
+    @images = @cloud.images(filter: ["name=="+$google_image_name_root])  # partial match is all we need
+    @image = last(@images)  # just grab one of them should be ok - may have to do some better regexp matching
+    $cloud_href = @cloud.href
+    $image_href = @image.href
   
-  call mci.mci_update_cloud_image(@mci, $cloud_href, $image_href)
+    call mci.mci_update_cloud_image(@mci, $cloud_href, $image_href)
+  end
 end
