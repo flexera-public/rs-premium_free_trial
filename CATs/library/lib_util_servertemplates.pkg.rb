@@ -17,7 +17,11 @@ define importServerTemplate($stmap) do
   foreach $st in keys($stmap) do
     $server_template_name = map($stmap, $st, "name")
     $server_template_rev = map($stmap, $st, "rev")
-    @pub_st = rs_cm.publications.index(filter: ["name=="+$server_template_name, "revision=="+$server_template_rev])
+    if $server_template_rev == "latest"
+      @pub_st = last(rs_cm.publications.index(filter: ["name=="+$server_template_name]))
+    else
+      @pub_st = rs_cm.publications.index(filter: ["name=="+$server_template_name, "revision=="+$server_template_rev])
+    end
     @pub_st.import()
   end
 end

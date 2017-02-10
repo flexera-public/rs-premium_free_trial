@@ -142,13 +142,13 @@ mapping "map_mci" do {
     "Google" => "Windows_Server_Datacenter_2008R2_x64"
   },
   "Windows 2012" => { # Different MCI for AWS vs ARM and not supported for Google so substituting an R2 version
-    "AWS" => "  Windows_Server_Standard_2012_x64",
+    "AWS" => "Windows_Server_Standard_2012_x64",
     "AzureRM" => "Windows_Server_Datacenter_2012_x64",
     "Google" => "Windows_Server_Datacenter_2012R2_x64"
   },
   "Windows 2012R2" => {
-    "AWS" => "  Windows_Server_Standard_2012R_x64",
-    "AzureRM" => "Windows_Server_Datacenter_2012R_x64",
+    "AWS" => "Windows_Server_Standard_2012R2_x64",
+    "AzureRM" => "Windows_Server_Datacenter_2012R2_x64",
     "Google" => "Windows_Server_Datacenter_2012R2_x64"
   },
 } end
@@ -177,6 +177,7 @@ end
 condition "inAzure" do
   like $conditions.inAzure
 end 
+  
 
 ############################
 # RESOURCE DEFINITIONS     #
@@ -184,9 +185,11 @@ end
 
 ### Server Definition ###
 resource "windows_server", type: "server" do
-  name 'Windows Server'
+  name join(['win',last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
+  network find(map($map_cloud, $param_location, "network"))
+  subnets find(map($map_cloud, $param_location, "subnet"))
   server_template_href find(map($map_st, "windows_server", "name"))
   multi_cloud_image find(map($map_mci, $param_servertype, $param_location))
   instance_type map($map_instancetype, $param_instancetype, $param_location)
@@ -259,7 +262,7 @@ end
 ##########################
 
 # Import and set up what is needed for the server and then launch it.
-define pre_auto_launch($map_cloud, $param_location, $map_st, @windows_server) do
+define pre_auto_launch($map_cloud, $param_location, $map_st) do
     
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -274,7 +277,7 @@ define pre_auto_launch($map_cloud, $param_location, $map_st, @windows_server) do
 
 end
 
-define enable(@windows_server, $param_costcenter, $inAzure) return $win_username, $credname, $cred_uri do
+define enable(@windows_server, $param_costcenter, $param_location) return $win_username, $credname, $cred_uri do
   
   # Tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
@@ -284,14 +287,17 @@ define enable(@windows_server, $param_costcenter, $inAzure) return $win_username
   $instance_info = @windows_server.current_instance().get(view: "sensitive")
   $admin_password = $instance_info[0]["admin_password"]
   $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",last(split(@@deployment.href,"/"))])
-  @cred = rs_cm.credentials.create({"name":$credname, "value": $param_password})
+  @cred = rs_cm.credentials.create({"name":$credname, "value": $admin_password})
   
   $cred_num = last(split(@cred.href, "/"))
-  call account_utilities.find_account() retrieve $account_num
+  call account_utilities.find_account_number() retrieve $account_num
   $cred_uri = "https://my.rightscale.com/acct/"+$account_num+"/credentials/"+$cred_num
   
-  $win_username = "rsadministrator"
-  
+  $win_username = "administrator"  
+  if ($param_location == "AzureRM") 
+    $win_username = "rsadministrator" 
+  end
+
 end 
 
 # Delete the credential created for the windows password
