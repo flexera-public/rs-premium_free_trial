@@ -24,7 +24,7 @@ define import_mci($pub_name) return @imported_item do
   @pubs = rs_cm.publications.index(filter: ["name=="+$pub_name])
   foreach @pub in @pubs do
    if @pub.name == $pub_name
-     @pub.import
+     @pub.import()
    end
   end
   call find_mci($pub_name) retrieve @imported_item

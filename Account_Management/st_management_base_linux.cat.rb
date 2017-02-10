@@ -19,7 +19,7 @@ parameter "param_starting_st" do
   category "Inputs"
   label "Name of RL10 Base Linux ServerTemplate" 
   type "string" 
-  default "RightLink 10.5.3 Linux Base"
+  default "RightLink 10.6.0 Linux Base"
 end
 
 operation "launch" do
@@ -44,7 +44,7 @@ define manage_st($param_starting_st) do
   end
   
   # If RL10 published ST is found, import it and then find it in the account
-  @rl10linux_st.import
+  @rl10linux_st.import()
   call st.find_st($param_starting_st) retrieve @rl10linux_st
   
   # Is there already a PFT Base Linux ST in the account?
@@ -61,7 +61,7 @@ define manage_st($param_starting_st) do
   call st.find_st($pft_base_linux_st_name) retrieve @pft_base_linux_st
   
   # Add the PFT Base Linux MCI as the default MCI to this newly created ST
-@st_mci = rs_cm.server_template_multi_cloud_images.create(server_template_multi_cloud_image: {multi_cloud_image_href: @pft_base_linux_mci.href, server_template_href: @pft_base_linux_st.href})
+  @st_mci = rs_cm.server_template_multi_cloud_images.create(server_template_multi_cloud_image: {multi_cloud_image_href: @pft_base_linux_mci.href, server_template_href: @pft_base_linux_st.href})
   @st_mci.make_default()
   
 end
