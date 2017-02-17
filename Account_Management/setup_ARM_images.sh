@@ -1,5 +1,8 @@
 #!/bin/sh
 
+### DEPRECATED ###
+# With the release of RL10.6.0 and install-at-boot support in AzureRM, there is no longer a need to manage ARM images.
+
 echo "This script creates a storage account and copies over the following two custom images from engineering for Azure RM Central US ONLY:
 https://armwestus.blob.core.windows.net/system/Microsoft.Compute/Images/vhds/CustomImage_Windows-2008R2_x64_v2016.07.27_RightLink_53705a2-save-osDisk.vhd
 https://armwestus.blob.core.windows.net/system/Microsoft.Compute/Images/vhds/CustomImage_Windows-2012R2_x64_v2016.07.27_RightLink_53705a2-save-osDisk.vhd
