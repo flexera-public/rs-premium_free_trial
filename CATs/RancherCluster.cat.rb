@@ -27,7 +27,7 @@
 # Support more clouds. This would require coordinating with the ST author to add images in other clouds.
 
 name 'Rancher Cluster'
-rs_ca_ver 20160622
+rs_ca_ver 20161221
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_logo.png) ![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
 
 Launches a Rancher cluster of Docker hosts."
@@ -75,7 +75,7 @@ parameter 'app_stack' do
   type "string"
   label "Application Stack"
   description "Select an application stack to launch on the Rancher Cluster."
-  allowed_values "WordPress", "Nginx"
+  allowed_values "WordPress", "Nginx" #, "ElasticSearch"
   default "WordPress"
 end
 
@@ -92,6 +92,19 @@ end
 ################################
 # Outputs returned to the user #
 ################################
+
+output "rancher_ui_link" do
+  category "Rancher UI Access"
+  label "Rancher UI Link"
+  description "Click to access the Rancher UI.(NOTE: username/passsword = \"rightscale\")"
+end
+
+output "rancher_infra_link" do
+  category "Rancher UI Access"
+  label "Rancher Infrastructure Page"
+  description "Click to see the Rancher Cluster infrastructure."
+end
+
 [*1..10].each do |n|
   output "app_#{n}_name" do
     label "Application Name"
@@ -120,18 +133,6 @@ end
   end
 end
 
-output "rancher_ui_link" do
-  category "Rancher UI Access"
-  label "Rancher UI Link"
-  description "Click to access the Rancher UI.(NOTE: username/passsword = \"rightscale\")"
-end
-
-output "rancher_infra_link" do
-  category "Rancher UI Access"
-  label "Rancher Infrastructure Page"
-  description "Click to see the Rancher Cluster infrastructure."
-end
-
 ##############
 # MAPPINGS   #
 ##############
@@ -145,11 +146,11 @@ end
 mapping "map_st" do {
   "server" => {
     "name" => "Rancher Server",
-    "rev" => "21", # previous: 17
+    "rev" => "30", # previous "21", # previous: 17
   },
   "host" => {
     "name" => "Rancher Host",
-    "rev" => "10", # previous: 7
+    "rev" => "20", # previous "10", # previous: 7
   },
 } end
 
@@ -160,7 +161,7 @@ mapping "map_mci" do {
   },
   "Public" => { # all other clouds
     "mci_name" => "Ubuntu_14.04_x64",
-    "mci_rev" => "20", # previous: 13
+    "mci_rev" => "55", # previous "20", # previous: 13
   }
 } end
 
@@ -200,13 +201,14 @@ resource 'rancher_server', type: 'server' do
   name 'Rancher Server'
   cloud map( $map_cloud, $param_location, "cloud" )
   datacenter map($map_cloud, $param_location, "zone")
-  instance_type map($map_cloud, $param_location, "instance_type")
+  instance_type "t2.medium"
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
   security_group_hrefs map($map_cloud, $param_location, "sg") 
   server_template find(map($map_st, "server", "name"), revision: map($map_st, "server", "rev"))
-  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
+#  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
   inputs do {
+    "RANCHER_HOST_PORT" => "text:8080",
     # Set the Route53 inputs to not use it.
     "ROUTE_53_UPDATE_RECORD" => "text:false",
     "ROUTE_53_AWS_ACCESS_KEY_ID" => "text:unused",
@@ -219,12 +221,12 @@ resource 'rancher_host', type: 'server_array' do
   name 'Rancher Host'
   cloud map( $map_cloud, $param_location, "cloud" )
   datacenter map($map_cloud, $param_location, "zone")
-  instance_type map($map_cloud, $param_location, "instance_type")
+#  instance_type map($map_cloud, $param_location, "instance_type")
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
   security_group_hrefs map($map_cloud, $param_location, "sg") 
   server_template find(map($map_st, "host", "name"), revision: map($map_st, "host", "rev"))
-  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
+#  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
   inputs do {
     # Set the Route53 inputs to not use it.
     "ROUTE_53_UPDATE_RECORD" => "text:false",
@@ -430,7 +432,7 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   # Check if the selected cloud is supported in this account.
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
-  call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
+  #call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
   
   # Find and import the server template - just in case it hasn't been imported to the account already
   call server_templates_utilities.importServerTemplate($map_st)
@@ -465,7 +467,7 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
   # construct the rancher server URL to be used by the Hosts
   $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
   $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080/"])
-  $rancher_infra_uri = join([$rancher_ui_uri, "infra/hosts"])
+  $rancher_infra_uri = join([$rancher_ui_uri, "env/1a5/infra/hosts"])
   
   # Test the API to make sure the server is ready
   call rancher_api(@rancher_server, "get", "/v1", "body") retrieve $body
@@ -515,72 +517,76 @@ end
 
 define deploy_stack(@rancher_server, $app_stack, $app_stack_name) return $app_names, $app_links, $app_graphs, $app_codes do
   
+  # Nothing special has been done to use load balancers and things like that.
+  # So the number of apps supported is limited to the number of hosts in the cluster.
+  # So check the numbers and raise an error if there is a problem.
+  $num_rancher_hosts = size(@@deployment.server_arrays().current_instances())  
+  call get_appstack_tags() retrieve $app_stacks_hash
+  $num_apps = size($app_stacks_hash)
+  $app_names = []
+  $app_links = []
+  $app_graphs = []
+  $app_codes = []
+    
+  # Do some checks before trying to launch the application stack.
+  # TODO: store the app list outputs such that you don't have to crawl the Rancher API to rebuild the outputs each time.
+  if ($num_apps >= $num_rancher_hosts)
+    call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
+    raise "Rancher stack limit reached. Either delete an application stack or add Rancher hosts before launching another stack."
+  elsif contains?(keys($app_stacks_hash), [$app_stack_name])
+    call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
+    raise "Rancher stack name already exists. Launch rancher stack with a unique name."
+  end
+  
+  # If we get this far, then we need to try to launch the application stack.
   $stack_name = $app_stack_name
+  $public_service = "tbd" # This is the service in the stack that has public URL access
   
 # WORDPRESS
   if $app_stack == "WordPress"
+    
+    # the docker_compose service that has public access ports
+    $public_service = "wordpress"  
+    
     # set up the compose files for the WordPress stack
     $docker_compose = 
-'wordpressapp:
-  restart: always
-  tty: true
+'wordpress:
   image: wordpress
   links:
-  - mysql:mysql
-  stdin_open: true
-loadbalancer:
+  - db:mysql
   ports:
-  - 80:80
-  restart: always
-  tty: true
-  image: rancher/load-balancer-service
-  links:
-  - wordpressapp:wordpressapp
-  stdin_open: true
-mysql:
-  restart: always
+  - 80:80/tcp
+db:
+  image: mariadb
   environment:
-    MYSQL_ROOT_PASSWORD: mymysqlpassword
-  tty: true
-  image: mysql
-  stdin_open: true'
+    MYSQL_ROOT_PASSWORD: example'
     
     $rancher_compose =
-'wordpressapp:
-  scale: 2
-loadbalancer:
+'wordpress:
   scale: 1
-  load_balancer_config:
-    name: loadbalancer config
-mysql:
-  scale: 1'
-    
+  start_on_create: true
+db:
+  scale: 1
+  start_on_create: true'   
+
 # NGINX
   elsif $app_stack == "Nginx"
+    
+    $public_service = "nginx"
+
     # set up the compose files for the nginx stack
     $docker_compose = 
-'nginxlb:
+'nginx:
       ports:
-        - 80:80
-      restart: always
-      tty: true
-      image: rancher/load-balancer-service
-      links:
-        - nginx:nginx
-      stdin_open: true
-nginx:
+      - 80:80
       restart: always
       tty: true
       image: nginx
       stdin_open: true'
     
     $rancher_compose =
-'nginxlb:
-      scale: 1
-      load_balancer_config:
-        name: nginxlb config
-nginx:
-      scale: 2'
+'nginx:
+      scale: 1'
     
 # Oops
   else
@@ -590,6 +596,9 @@ nginx:
   # Launch the stack on the Rancher server
   call launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_compose) 
 
+  # Store the stack info as tags
+  call maintain_app_stack_info("add", $app_stack_name, $public_service)
+  
   # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
   call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
   
@@ -604,8 +613,9 @@ define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_comp
     'RANCHER_COMPOSE_DOCKER_YAML':join(['text:', $docker_compose]),     
     'RANCHER_COMPOSE_RANCHER_YAML':join(['text:', $rancher_compose])
   }
-  
+    
   call server_templates_utilities.run_script_inputs(@rancher_server, "Run rancher-compose", $inp)
+  
  
 end
 
@@ -638,6 +648,9 @@ define delete_stack(@rancher_server, $app_stack_name) return $app_names, $app_li
    end
   end
   
+  # Remove the app stack from the deployment tags 
+  call maintain_app_stack_info("delete", $app_stack_name, "na")
+
   # Now get the list of applications to output - do this each time to account for any changes and shuffling of load balancers
   call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
   
@@ -668,6 +681,10 @@ define get_app_lists(@rancher_server) return $app_names, $app_links, $app_graphs
   $app_graphs = [["placeholder"]]
   $app_codes = [["placeholder"]]
     
+  # Gather up the application stack info stored as tags on the deployment.
+  # This is used to find the application stacks from Rancher and get the URL for accessing the stack. 
+  call get_appstack_tags() retrieve $app_stacks_hash
+
   # Get the rancher server's url - needed to construct the Rancher UI links for each app   
   $rancher_server_ip = @rancher_server.current_instance().public_ip_addresses[0]
   $rancher_ui_uri = join(["http://", $rancher_server_ip, ":8080"])
@@ -675,6 +692,7 @@ define get_app_lists(@rancher_server) return $app_names, $app_links, $app_graphs
   # Environments = Application Stacks in Rancher
   # Get list of application stacks
   call rancher_api(@rancher_server, "get", "/v1/projects", "data") retrieve $projects 
+  $project_id = $projects[0]["id"]
   $envs_url = $projects[0]["links"]["environments"]
   call rancher_api(@rancher_server, "get", $envs_url, "data") retrieve $envs_array
 
@@ -683,55 +701,54 @@ define get_app_lists(@rancher_server) return $app_names, $app_links, $app_graphs
     
     # Go through each application and gather up the information
     foreach $env_spec in $envs_array do
-      $lb_host_ip_address = ""
       
       # Get the stack name
       $app_name = $env_spec["name"]
         
-      # Get the Rancher ID for the stack and create a couple of Rancher UI links for the app
-      $app_id = $env_spec["id"]
-      $app_ui_base_path = join([$rancher_ui_uri, "/apps/", $app_id])
-      $app_graph = join([$app_ui_base_path, "/graph"])
-      $app_code = join([$app_ui_base_path, "/code"])
+      # Is the environment (i.e. application) returned by rancher one we care about?
+      if (contains?(keys($app_stacks_hash), [$app_name]))
+        # Get the Rancher ID for the stack and create a couple of Rancher UI links for the app
+        $app_id = $env_spec["id"]
+        $app_ui_base_path = join([$rancher_ui_uri, "/env/",$project_id, "/apps/stacks/",$app_id])
+        $app_graph = join([$app_ui_base_path, "/graph"])
+        $app_code = join([$app_ui_base_path, "/code"])
+     
+        $app_access_host_ip_address = ""
+     
+        # Now drill through the API to get the IP/link to the application stack
+          
+        # Loop through the services launched for the given stack
+        $app_services_url = $env_spec["links"]["services"]
+         
+        call check_app_service_is_ready($app_services_url, $app_stacks_hash[$app_name]) retrieve $app_service
         
-      # Now drill through the API to get the link to the load balancer in front of the stack.
-      # This code assumes that a Rancher load balancer is deployed.
+        $app_access_service_instance_url = $app_service["links"]["instances"]
+        call rancher_api(@rancher_server, "get", $app_access_service_instance_url, "data") retrieve $app_access_service_instance
+#        call err_utilities.log("app_access_service_instance:", to_s($app_access_service_instance))
         
-      # Loop through the services launched for the given stack
-      $app_services_url = $env_spec["links"]["services"]
+        $app_access_service_host_url = $app_access_service_instance[0]["links"]["hosts"]
+        call rancher_api(@rancher_server, "get", $app_access_service_host_url, "data") retrieve $app_access_service_host
+#        call err_utilities.log("app_access_service_host:", to_s($app_access_service_host))
         
-      call check_app_services_are_ready($app_services_url) retrieve $app_services
-      
-      foreach $app_service in $app_services do
-          
-        # We only care about the loadbalancer service
-        if $app_service["type"] == "loadBalancerService"
-          $lb_service_instance_url = $app_service["links"]["instances"]
-          call rancher_api(@rancher_server, "get", $lb_service_instance_url, "data") retrieve $lb_service_instance
-          call err_utilities.log("lb_service_instance:", to_s($lb_service_instance))
-          
-          $lb_service_host_url = $lb_service_instance[0]["links"]["hosts"]
-          call rancher_api(@rancher_server, "get", $lb_service_host_url, "data") retrieve $lb_service_host
-          call err_utilities.log("lb_service_host:", to_s($lb_service_host))
-          
-          $lb_service_host_ip_url = $lb_service_host[0]["links"]["ipAddresses"]
-          call rancher_api(@rancher_server, "get", $lb_service_host_ip_url, "data") retrieve $lb_service_host_ip_info
-          call err_utilities.log("lb_service_host_ip_info:", to_s($lb_service_host_ip_info))
-          
-          # Here's the Easter egg we've been searching for
-          $lb_host_ip_address = $lb_service_host_ip_info[0]["address"]
-          call err_utilities.log("lb_host_ip_address: "+$lb_host_ip_address, "")
-        end
-      end
+        $app_access_service_host_ip_url = $app_access_service_host[0]["links"]["ipAddresses"]
+        call rancher_api(@rancher_server, "get", $app_access_service_host_ip_url, "data") retrieve $app_access_service_host_ip_info
+#        call err_utilities.log("app_access_service_host_ip_info:", to_s($app_access_service_host_ip_info))
+        
+        # Here's the Easter egg we've been searching for
+        $app_access_host_private_ip_address = $app_access_service_host_ip_info[0]["address"]
+#        call err_utilities.log("app_access_host_ip_address: "+$app_access_host_private_ip_address, "")
+        # But this is the private IP address - the rancher host doesn't seem to know about the public IPs
+        # So find the public IP
+        call get_host_public_ip($app_access_host_private_ip_address) retrieve $app_access_host_ip_address
     
-      $app_link = "http://" + $lb_host_ip_address
-      call err_utilities.log("app_link: "+$app_link, "")
-        
-      $app_names << [$app_name]
-      $app_links << [$app_link]
-      $app_graphs << [$app_graph]
-      $app_codes << [$app_code]
-           
+        $app_link = "http://" + $app_access_host_ip_address
+#        call err_utilities.log("app_link: "+$app_link, "")
+          
+        $app_names << [$app_name]
+        $app_links << [$app_link]
+        $app_graphs << [$app_graph]
+        $app_codes << [$app_code]
+      end    
     end
   else # no stacks so just put some empty data in there
     $app_names << [""]
@@ -767,6 +784,7 @@ end
 
 # Calls the Rancher API and returns the whole "body" of the response or just the "data" section
 define rancher_api(@rancher_server, $action, $api_uri, $message_part_returned) return $api_response do
+  
   
   if $api_uri =~ "(http)"  # then we have the full url already
     $api_url = $api_uri
@@ -824,17 +842,65 @@ end
 
 # Sometimes there's a race condition with the CAT gathering up the application list and the services really be ready.
 # So this function gets the app_services checks to make sure the services are ready.
-define check_app_services_are_ready($app_services_url) return $app_services do
-  $app_services = ""
+define check_app_service_is_ready($app_services_url, $service_of_interest) return $app_service_of_interest do
   $not_ready = true
+  $app_service_of_interest = ""
   while $not_ready do
     call rancher_api(@rancher_server, "get", $app_services_url, "data") retrieve $app_services      
     foreach $app_service in $app_services do
-      # The key is the load balancer service so if it's there and active then this application stack is good to go
-      if $app_service["type"] == "loadBalancerService" && $app_service["state"] == "active"
+      if $app_service["name"] == $service_of_interest && $app_service["state"] == "active"
+        $app_service_of_interest = $app_service
         $not_ready = false
       end
     end
   end
 end
+
+# Gather up the application stack info stored as tags on the deployment.
+define get_appstack_tags() return $app_stacks_hash do
+  $tags = rs_cm.tags.by_resource(resource_hrefs: [@@deployment.href])
+  $all_tags_array = $tags[0][0]['tags']
+  $app_stacks_hash = {}
+  foreach $tag_item in $all_tags_array do
+    $tag = $tag_item["name"]
+    if $tag =~ /rancher_stack_info/
+      $tag_key_value = split($tag, ":")[1]
+      $tag_key = split($tag_key_value, "=")[0]
+      $tag_value = split($tag_key_value, "=")[1]
+      $app_stack_hash = {$tag_key : $tag_value}
+      $app_stacks_hash = $app_stacks_hash + $app_stack_hash
+    end
+  end
+end
+
+# Used to store launched stack info as tags on the deployment
+define maintain_app_stack_info($action, $stack_name, $public_service) do
+  if ($action == "add")
+ 
+    $tag = "rancher_stack_info:"+$stack_name+"="+$public_service
+    rs_cm.tags.multi_add(resource_hrefs: [@@deployment.href], tags: [$tag])
+
+  elsif ($action == "delete")
+    
+    $public_service = tag_value(@@deployment, "rancher_stack_info:"+$stack_name)
+    $tag = "rancher_stack_info:"+$stack_name+"="+$public_service
+    rs_cm.tags.multi_delete(resource_hrefs: [@@deployment.href], tags: [$tag])
+
+  else
+    raise "maintain_app_stack_info: Unknown action."
+  end
+end
+
+# look at the servers in the host array with the given private IP address and return the public IP
+define get_host_public_ip($app_access_host_private_ip_address) return $app_access_host_ip_address do
+  $app_access_host_ip_address = $app_access_host_private_ip_address # will be updated with public ip below
+  @server_array_instances = @@deployment.server_arrays().current_instances()
+  
+  foreach @instance in @server_array_instances do
+    if @instance.private_ip_addresses[0] == $app_access_host_private_ip_address
+      $app_access_host_ip_address = @instance.public_ip_addresses[0]
+    end
+  end
+end
+
 
