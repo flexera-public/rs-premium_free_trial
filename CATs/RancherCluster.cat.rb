@@ -480,7 +480,7 @@ define launch_cluster(@rancher_server, @rancher_host, @ssh_key, @sec_group, @sec
 
   # Get the keys from the API
   call rancher_api(@rancher_server, "post", "/v1/projects/1a5/apikeys", "body") retrieve $body
-  call err_utilities.log("debug: apikeys response type", to_s(type($body)))
+#  call err_utilities.log("debug: apikeys response type", to_s(type($body)))
   
   $publicValue = $body["publicValue"] # Public API key
   $secretValue = $body["secretValue"] # Secret API key
@@ -695,7 +695,7 @@ define get_current_app_lists() return $app_names, $app_links, $app_graphs, $app_
        end
      end
    end
-   call err_utilities.log("app_names array:", to_s($app_names))
+#   call err_utilities.log("app_names array:", to_s($app_names))
 end
 
 # use the Rancher Server API to gather up information about what stacks are running on the cluster
