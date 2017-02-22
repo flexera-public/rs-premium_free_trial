@@ -531,10 +531,10 @@ define deploy_stack(@rancher_server, $app_stack, $app_stack_name) return $app_na
   # Do some checks before trying to launch the application stack.
   # TODO: store the app list outputs such that you don't have to crawl the Rancher API to rebuild the outputs each time.
   if ($num_apps >= $num_rancher_hosts)
-    call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
+    call get_current_app_lists() retrieve $app_names, $app_links, $app_graphs, $app_codes
     raise "Rancher stack limit reached. Either delete an application stack or add Rancher hosts before launching another stack."
   elsif contains?(keys($app_stacks_hash), [$app_stack_name])
-    call get_app_lists(@rancher_server) retrieve $app_names, $app_links, $app_graphs, $app_codes
+    call get_current_app_lists() retrieve $app_names, $app_links, $app_graphs, $app_codes
     raise "Rancher stack name already exists. Launch rancher stack with a unique name."
   end
   
@@ -616,7 +616,6 @@ define launch_stack(@rancher_server, $stack_name, $docker_compose, $rancher_comp
     
   call server_templates_utilities.run_script_inputs(@rancher_server, "Run rancher-compose", $inp)
   
- 
 end
 
 # Delete specified application stack
@@ -670,6 +669,33 @@ define add_nodes(@rancher_host, $num_add_nodes) do
   if !all?(@rancher_host.current_instances().state[], "operational")
     raise "Some instances failed to start"    
   end
+end
+
+# Gather up the cloud app outputs to rebuild outputs 
+define get_current_app_lists() return $app_names, $app_links, $app_graphs, $app_codes do
+   @execution_expanded = @@execution.get(view:"expanded")
+   $execution_expanded = to_object(@execution_expanded)
+   $outputs = $execution_expanded["details"][0]["outputs"]
+   $app_names = [["placeholder"]]
+   $app_links = [["placeholder"]]
+   $app_graphs = [["placeholder"]]
+   $app_codes = [["placeholder"]]
+   foreach $output in $outputs do 
+     $output_value = $output["value"]["value"]
+     if $output_value != ""
+       $output_name = $output["name"]
+       if $output_name =~ /app_[0-9]+_name/
+         $app_names << [$output_value]
+       elsif $output_name =~ /app_[0-9]+_link/
+         $app_links << [$output_value]
+       elsif $output_name =~ /app_[0-9]+_graph/
+         $app_graphs << [$output_value]
+       elsif $output_name =~ /app_[0-9]+_code/
+         $app_codes << [$output_value]
+       end
+     end
+   end
+   call err_utilities.log("app_names array:", to_s($app_names))
 end
 
 # use the Rancher Server API to gather up information about what stacks are running on the cluster
