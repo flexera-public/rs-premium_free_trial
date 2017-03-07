@@ -49,16 +49,16 @@ RightScripts:
     Revision: 5
     Publisher: RightScale
   - Name: RL10 Linux Setup Hostname
-    Revision: 7
+    Revision: 8
     Publisher: RightScale
   - Name: RL10 Linux Enable Managed Login
-    Revision: 10
+    Revision: 12
     Publisher: RightScale
   - Name: RL10 Linux Setup Alerts
-    Revision: 1
+    Revision: 2
     Publisher: RightScale
   - Name: RL10 Linux Setup Automatic Upgrade
-    Revision: 2
+    Revision: 4
     Publisher: RightScale
   - Name: Chef Client Install
     Revision: 5
@@ -66,24 +66,35 @@ RightScripts:
   - Name: RS-Base Install - chef
     Revision: 1
     Publisher: RS Professional Services
-  - PHP_Appserver_Install-chef
-  - PHP_Appserver_Application_Backend-chef
+  - Name: PHP Appserver Install - chef
+    Revision: 10
+    Publisher: RS Professional Services
+  - Name: PHP Appserver Application Backend - chef
+    Revision: 7
+    Publisher: RS Professional Services
+  - PFT_DB_Config
   Decommission:
   - Name: RL10 Linux Shutdown Reason
-    Revision: 4
+    Revision: 5
     Publisher: RightScale
   - Name: Chef Client Delete Node
     Revision: 5
     Publisher: RS Professional Services
-  - PHP_Appserver_Application_Backend_Detach-chef
+  - Name: PHP Appserver Application Backend Detach - chef
+    Revision: 7
+    Publisher: RS Professional Services
   Operational:
-  - PHP_Appserver_Application_Backend-chef
-  - PHP_Appserver_Application_Backend_Detach-chef
+  - Name: PHP Appserver Application Backend - chef
+    Revision: 7
+    Publisher: RS Professional Services
+  - Name: PHP Appserver Application Backend Detach - chef
+    Revision: 7
+    Publisher: RS Professional Services
   - Name: RL10 Linux Setup Automatic Upgrade
-    Revision: 2
+    Revision: 4
     Publisher: RightScale
   - Name: RL10 Linux Upgrade
-    Revision: 6
+    Revision: 8
     Publisher: RightScale
 MultiCloudImages:
   - Name: PFT Base Linux MCI

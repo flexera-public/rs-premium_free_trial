@@ -1,0 +1,10 @@
+#! /usr/bin/sudo /bin/bash
+# ---
+# RightScript Name: PFT DB Config
+# Description: Moves the db config file created by the chef app config to the correct location for the PFT example app
+# Inputs: {}
+# Attachments: []
+# ...
+
+rm /usr/local/www/sites/pft/current/config/db.php
+ln -sf /usr/local/www/sites/pft/shared/db.php /usr/local/www/sites/pft/current/config/db.php

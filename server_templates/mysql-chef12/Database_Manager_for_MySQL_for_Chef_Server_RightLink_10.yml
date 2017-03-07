@@ -50,16 +50,16 @@ RightScripts:
     Revision: 5
     Publisher: RightScale
   - Name: RL10 Linux Setup Hostname
-    Revision: 7
+    Revision: 8
     Publisher: RightScale
   - Name: RL10 Linux Enable Managed Login
-    Revision: 10
+    Revision: 12
     Publisher: RightScale
   - Name: RL10 Linux Setup Alerts
-    Revision: 1
+    Revision: 2
     Publisher: RightScale
   - Name: RL10 Linux Setup Automatic Upgrade
-    Revision: 2
+    Revision: 4
     Publisher: RightScale
   - Name: Chef Client Install
     Revision: 5
@@ -68,46 +68,46 @@ RightScripts:
     Revision: 1
     Publisher: RS Professional Services
   - Name: Mysql Server Install - chef
-    Revision: 10
+    Revision: 12
     Publisher: RS Professional Services
   - PFT_RL10_Dump_Import.sh
   Decommission:
   - Name: RL10 Linux Shutdown Reason
-    Revision: 4
+    Revision: 5
     Publisher: RightScale
   - Name: Chef Client Delete Node
     Revision: 5
     Publisher: RS Professional Services
   - Name: Mysql Server Decommission - chef
-    Revision: 5
+    Revision: 6
     Publisher: RS Professional Services
   Operational:
     - Name: Mysql Server Install - chef
-      Revision: 10
+      Revision: 12
       Publisher: RS Professional Services
     - Name: Mysql Server Volume - chef
-      Revision: 6
-      Publisher: RS Professional Services
-    - Name: Mysql Server Stripe - chef
-      Revision: 6
-      Publisher: RS Professional Services
-    - Name: Mysql Server Master - chef
-      Revision: 9
-      Publisher: RS Professional Services
-    - Name: Mysql Server Slave - chef
-      Revision: 8
-      Publisher: RS Professional Services
-    - Name: Mysql Server Schedule - chef
-      Revision: 5
-      Publisher: RS Professional Services
-    - Name: Mysql Server Backup - chef
       Revision: 7
       Publisher: RS Professional Services
+    - Name: Mysql Server Stripe - chef
+      Revision: 7
+      Publisher: RS Professional Services
+    - Name: Mysql Server Master - chef
+      Revision: 10
+      Publisher: RS Professional Services
+    - Name: Mysql Server Slave - chef
+      Revision: 9
+      Publisher: RS Professional Services
+    - Name: Mysql Server Schedule - chef
+      Revision: 6
+      Publisher: RS Professional Services
+    - Name: Mysql Server Backup - chef
+      Revision: 8
+      Publisher: RS Professional Services
     - Name: RL10 Linux Setup Automatic Upgrade
-      Revision: 2
+      Revision: 4
       Publisher: RightScale
     - Name: RL10 Linux Upgrade
-      Revision: 6
+      Revision: 8
       Publisher: RightScale
 MultiCloudImages:
   - Name: PFT Base Linux MCI
