@@ -30,36 +30,48 @@ define import_mci($pub_name) return @imported_item do
   call find_mci($pub_name) retrieve @imported_item
 end
 
-# Update an MCI to point to a new image for a given cloud.
-define mci_update_cloud_image(@mci, $cloud_href, $image_href) do
+# Update an MCI to point to a new image for a given cloud, or add an image to
+# for a cloud which was not previously supported.
+define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
+  $updated = false
   # update the MCI setting to point to a given cloud image.
   @mci_settings = @mci.settings()
   foreach @setting in @mci_settings do
-    sub on_error: skip do  # There may be cloud() links in the collection that are undefined in the account. 
+    sub on_error: skip do  # There may be cloud() links in the collection that are undefined in the account.
       if @setting.cloud().href == $cloud_href
         @setting.update(multi_cloud_image_setting: {image_href: $image_href})
+        $updated = true
       end
     end
+  end
+
+  # Insert usecase
+  if (!$updated)
+    @cloud = rs_cm.get($cloud_href)
+
+    @instance_types = @cloud.instance_types()
+    @instance_type = last(@instance_types)
+    @mci_settings.create(multi_cloud_image_setting: {image_href: $image_href, cloud_href: $cloud_href, instance_type_href: @instance_type.href})
   end
 end
 
 # Update a given MCI with the settings from another MCI
 define copy_mci_settings(@source_mci, @target_mci) do
-  
+
   # Get the settings for the source mci
   @source_mci_settings = @source_mci.settings()
   # Create a hash to get quick access to the image href based on the cloud href
   $source_href_hash = {}
   foreach @setting in @source_mci_settings do
-    sub on_error: skip do # There may be cloud() links in the collection that are undefined in the account. 
+    sub on_error: skip do # There may be cloud() links in the collection that are undefined in the account.
       $source_href_hash[@setting.cloud().href] = @setting.image().href
     end
   end
-  
+
   # Get the settings in the target_mci
   @target_mci_settings = @target_mci.settings()
   foreach @target_setting in @target_mci_settings do
-    sub on_error: skip do # There may be cloud() links in the collection that are undefined in the account. 
+    sub on_error: skip do # There may be cloud() links in the collection that are undefined in the account.
       @target_setting.update(multi_cloud_image_setting: {image_href: $source_href_hash[@target_setting.cloud().href]})
     end
   end
