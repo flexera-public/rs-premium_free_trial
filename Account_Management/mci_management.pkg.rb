@@ -46,8 +46,8 @@ define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
   end
 
   # Insert usecase
-  if (!$updated)
-    @cloud = rs_cm.get($cloud_href)
+  if !$updated
+    @cloud = rs_cm.get(href: $cloud_href)
 
     @instance_types = @cloud.instance_types()
     @instance_type = last(@instance_types)
