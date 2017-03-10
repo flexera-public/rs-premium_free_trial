@@ -1,5 +1,6 @@
 CATs/library/lib_util_err.pkg.rb
 CATs/library/lib_util_servertemplates.pkg.rb
+CATs/library/lib_util_account.pkg.rb
 Account_Management/mci_management.pkg.rb
 Account_Management/network_management.cat.rb
 Account_Management/mci_management_base_linux.cat.rb
