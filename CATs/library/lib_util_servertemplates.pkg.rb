@@ -14,7 +14,7 @@ end
 # Imports the server templates found in the given map.
 # It assumes a "name" and "rev" mapping
 define importServerTemplate($stmap) do
-  foreach $st in keys($stmap) do
+  concurrent foreach $st in keys($stmap) do
     $server_template_name = map($stmap, $st, "name")
     $server_template_rev = map($stmap, $st, "rev")
     if $server_template_rev == "latest"
