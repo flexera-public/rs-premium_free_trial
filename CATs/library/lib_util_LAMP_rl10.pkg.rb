@@ -26,12 +26,12 @@ define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @se
 
   call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
 
-  call launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  retrieve @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link
+  call launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name)  retrieve @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link
 
 end
 
 
-define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
+define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
 
   # Provision the resources
 
@@ -51,11 +51,36 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
 
   # Provision the placement group if applicable
   if $needsPlacementGroup
-      provision(@placement_group)
+    provision(@placement_group)
   end
 
+  $chef_hash = to_object(@chef_server)
+  $lb_hash = to_object(@lb_server)
+  $webtier_hash = to_object(@app_server)
+
+  $db_hash = to_object(@db_server)
+
+  if $cloud_name == "Google"
+    @cloud = rs_cm.clouds.get(filter: ["name==Google"])
+
+    if (size(@cloud) > 0)
+      @images = @cloud.images(filter: ["name==ubuntu-1404-trusty-v"])  # partial match is all we need
+      @image = last(@images)  # just grab one of them should be ok - may have to do some better regexp matching
+      $image_href = @image.href
+      $chef_hash["fields"]["image_href"] = $image_href
+      $lb_hash["fields"]["image_href"] = $image_href
+      $webtier_hash["fields"]["image_href"] = $image_href
+      $db_hash["fields"]["image_href"] = $image_href
+    end
+  end
+
+  ##############################################################################
+  # CHEF SERVER
   # Launch the chef server first and wait, it is a prereq.
+  ##############################################################################
+  @chef_server = $chef_hash
   provision(@chef_server)
+
   $key_tagval = tag_value(@chef_server.current_instance(), 'chef_org_validator:pft')
   $key = gsub(gsub($key_tagval, ',', '\n'), 'eq;', '=')
   $key_credname = 'PFT-LAMP-ChefValidator-'+last(split(@@deployment.href,"/"))
@@ -67,14 +92,12 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
   rs_cm.credentials.create(credential: {name: $cert_credname, value: $cert})
 
   rs_cm.tags.multi_delete(resource_hrefs: @chef_server.href[], tags: ["chef_org_validator:pft="+$key_tagval,"chef_server:ssl_cert="+$cert_tagval])
+  ##############################################################################
+  # /CHEF SERVER
+  ##############################################################################
 
-  $lb_hash = to_object(@lb_server)
   $lb_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',@chef_server.current_instance().public_ip_addresses[0],'/organizations/pft'])
-
-  $webtier_hash = to_object(@app_server)
   $webtier_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',@chef_server.current_instance().public_ip_addresses[0],'/organizations/pft'])
-
-  $db_hash = to_object(@db_server)
   $db_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',@chef_server.current_instance().public_ip_addresses[0],'/organizations/pft'])
 
   @lb_server = $lb_hash
