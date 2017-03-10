@@ -135,7 +135,13 @@ if [[ "$options" == *"all"* || "$options" == *"management"* ]]
 then
   echo "Launching management CATs."
 
-  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Network Setup"
+  azure_clouds=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index clouds "filter[]=cloud_type==azure_v2")
+  if [[ -z "$azure_clouds" ]]
+  then
+    echo "No AzureV2 clouds, the network management CAT will not be executed"
+  else
+    management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Network Setup"
+  fi
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux MCI Setup/Maintenance"
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux ServerTemplate Setup/Maintenance"
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT LAMP ServerTemplates Prerequisite Import"

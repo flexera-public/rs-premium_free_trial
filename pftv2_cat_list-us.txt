@@ -6,6 +6,7 @@ Account_Management/network_management.cat.rb
 Account_Management/mci_management_base_linux.cat.rb
 Account_Management/st_management_base_linux.cat.rb
 Account_Management/st_management_lamp.cat.rb
+CATs/library/lib_common_LAMP_rl10_outputs.pkg.rb
 CATs/library/lib_common_parameters.pkg.rb
 CATs/library/lib_common_LAMP_rl10_parameters.pkg.rb
 CATs/library/lib_common_mappings.us.pkg.rb
