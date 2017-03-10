@@ -46,7 +46,8 @@ define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
   end
 
   # Insert usecase
-  if !$updated
+  @mci_setting = @mci.settings(filter: ["cloud_href=="+$cloud_href])
+  if (size(@mci_setting) == 0)
     @cloud = rs_cm.get(href: $cloud_href)
 
     @instance_types = @cloud.instance_types()

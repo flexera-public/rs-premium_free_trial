@@ -100,9 +100,11 @@ define create_pft_base_linux_mci($mci_name, @base_mci) return @mci do
 
   # Find the MCI in the account
   call mci.find_mci($mci_name) retrieve @mci
-
-  call get_vmware_cloud_elements() retrieve $vmware_cloud_href, $vmware_image_href, $vmware_instance_type_href
-  @mci.settings().create(multi_cloud_image_setting: {cloud_href: $vmware_cloud_href, image_href: $vmware_image_href, instance_type_href: $vmware_instance_type_href})
+  @cloud = rs_cm.clouds.get(filter: ["cloud_type==vscale"])
+  if (size(@cloud) > 0)
+    call get_vmware_cloud_elements(first(@cloud)) retrieve $vmware_cloud_href, $vmware_image_href, $vmware_instance_type_href
+    @mci.settings().create(multi_cloud_image_setting: {cloud_href: $vmware_cloud_href, image_href: $vmware_image_href, instance_type_href: $vmware_instance_type_href})
+  end
 end
 
 define get_vmware_cloud_elements(@vmware_cloud) return $cloud_href, $image_href, $instance_type_href do
@@ -116,10 +118,10 @@ define get_vmware_cloud_elements(@vmware_cloud) return $cloud_href, $image_href,
 end
 
 define update_vmware_image(@mci) do
-  @cloud = rs_cm.clouds.get(filter: ["name==VMware Private Cloud"])
+  @cloud = rs_cm.clouds.get(filter: ["cloud_type==vscale"])
   if (size(@cloud) > 0)
     # Get the vmware cloud related items
-    call get_vmware_cloud_elements(@cloud) retrieve $vmware_cloud_href, $vmware_image_href, $vmware_instance_type_href
+    call get_vmware_cloud_elements(first(@cloud)) retrieve $vmware_cloud_href, $vmware_image_href, $vmware_instance_type_href
     call mci.mci_upsert_cloud_image(@mci, $vmware_cloud_href, $vmware_image_href)
   end
 end
