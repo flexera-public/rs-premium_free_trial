@@ -32,6 +32,7 @@ Clouds Supported: <B>AWS, AzureRM, Google, VMware</B>"
 
 import "pft/parameters"
 import "pft/rl10/lamp_parameters", as: "lamp_parameters"
+import "pft/rl10/lamp_outputs", as: "lamp_outputs"
 import "pft/mappings"
 import "pft/rl10/lamp_mappings", as: "lamp_mappings"
 import "pft/conditions"
@@ -67,29 +68,19 @@ end
 # Outputs returned to the user #
 ################################
 output "site_url" do
-  label "Web Site URL"
-  category "Output"
-  description "Click to see your web site."
+  like $lamp_outputs.site_url
 end
 
 output "lb_status" do
-  label "Load Balancer Status Page"
-  category "Output"
-  description "Accesses Load Balancer status page"
+  like $lamp_outputs.lb_status
 end
 
 output "app1_github_link" do
-  label "Yellow Application Code"
-  category "Code Repositories"
-  description "\"Yellow\" application repo. (The main change is in the style.css file.)"
-  default_value "https://github.com/rightscale/examples/tree/unified_php"
+  like $lamp_outputs.app1_github_link
 end
 
 output "app2_github_link" do
-  label "Blue Application Code"
-  category "Code Repositories"
-  description "\"Blue\" application repo. (The main change is in the style.css file.)"
-  default_value "https://github.com/rs-services/rs-premium_free_trial/tree/unified_php_modified"
+  like $lamp_outputs.app2_github_link
 end
 
 
