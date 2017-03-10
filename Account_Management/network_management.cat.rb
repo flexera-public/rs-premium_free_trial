@@ -27,6 +27,15 @@ operation "launch" do
   definition "setup_networks"
 end
 
+operation "auto_terminate" do
+  description "Don't delete the last network which was created"
+  definition "nil_auto_terminate"
+end
+
+define nil_auto_terminate(@base_network) return @base_network do
+
+end
+
 define setup_networks(@base_network) do
 
   # Use this as the base for provisioning the networks in each cloud
@@ -43,11 +52,12 @@ define setup_networks(@base_network) do
   # Find the clouds attached to the account
   @arm_clouds = rs_cm.clouds.get(filter: ["cloud_type==azure_v2"])
 
-  foreach @arm_cloud in @arm_clouds do
+  concurrent foreach @arm_cloud in @arm_clouds do
     $arm_cloud_href = @arm_cloud.href
     if logic_not(contains?($current_pft_arm_network_cloud_hrefs, [$arm_cloud_href]))
       $new_network = $base_network_hash
       $new_network["fields"]["cloud_href"] = $arm_cloud_href
+      $new_network["fields"]["deployment_href"] = null
       @new_network = $new_network
       sub on_error: skip do  # Silently fail, this is for idempotency. I.E. The network already exists.
         provision(@new_network)

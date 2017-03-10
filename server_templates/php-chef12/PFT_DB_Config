@@ -2,9 +2,42 @@
 # ---
 # RightScript Name: PFT DB Config
 # Description: Moves the db config file created by the chef app config to the correct location for the PFT example app
-# Inputs: {}
+# Inputs:
+#   DATABASE_HOST:
+#     Category: Application
+#     Description: 'The FQDN of the database server. Example: db.example.com'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_SCHEMA:
+#     Category: Application
+#     Description: 'The password used to connect to the database. Example: cred:MYSQL_APPLICATION_PASSWORD'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_USER:
+#     Category: Application
+#     Description: 'The username used to connect to the database. Example: cred:MYSQL_APPLICATION_USERNAME'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_PASSWORD:
+#     Category: Application
+#     Input Type: single
+#     Required: true
+#     Advanced: false
 # Attachments: []
 # ...
 
 rm /usr/local/www/sites/pft/current/config/db.php
+
+cat <<EOF > /usr/local/www/sites/pft/shared/db.php
+<?php
+//DataBase Connect Infomation
+\$hostname_DB = "$DATABASE_HOST";
+\$database_DB = "$DATABASE_SCHEMA";
+\$username_DB = "$DATABASE_USER";
+\$password_DB = "$DATABASE_PASSWORD";
+?>
+EOF
 ln -sf /usr/local/www/sites/pft/shared/db.php /usr/local/www/sites/pft/current/config/db.php
