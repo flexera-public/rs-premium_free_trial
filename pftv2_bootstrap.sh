@@ -42,7 +42,7 @@ fi
 
 
 export RIGHT_ST_LOGIN_ACCOUNT_ID=$ACCOUNT_ID
-export RIGHT_ST_LOGIN_ACOUNT_HOST=$SHARD_HOSTNAME
+export RIGHT_ST_LOGIN_ACCOUNT_HOST=$SHARD_HOSTNAME
 export RIGHT_ST_LOGIN_ACCOUNT_REFRESH_TOKEN=$OAUTH_REFRESH_TOKEN
 
 hasrsc=$(which rsc)
@@ -146,10 +146,10 @@ fi
 if [[ "$options" == *"all"* || "$options" == *"sts"* ]]
 then
   echo "Upserting ServerTemplates."
-  right_st server_templates/chef_server/*.yml
-  right_st server_templates/haproxy-chef12/*.yml
-  right_st server_templates/mysql-chef12/*.yml
-  right_st server_templates/php-chef12/*.yml
+  right_st st upload server_templates/chef_server/*.yml
+  right_st st upload server_templates/haproxy-chef12/*.yml
+  right_st st upload server_templates/mysql-chef12/*.yml
+  right_st st upload server_templates/php-chef12/*.yml
 else
   echo "Skipping ServerTemplates."
 fi
