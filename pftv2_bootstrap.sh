@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# TODO: test and publish them
 if [[ "$*" == *"help"* ]]
 then
   echo "Usage: pftv2_bootstrap.sh [options]"
@@ -8,6 +9,7 @@ then
   echo "    cats - Upserts all libraries and application cats"
   echo "    sts - Upserts all ServerTemplates"
   echo "    management - Launches management CATs for creating networks, MCI, and STs"
+  echo "    creds - Upserts the PFT_RS_REFRESH_TOKEN credential with the value provided in OAUTH_REFRESH_TOKEN"
 fi
 
 options="all"
@@ -21,6 +23,23 @@ then
   echo "The following environment variables must be set. OAUTH_REFRESH_TOKEN, ACCOUNT_ID, SHARD_HOSTNAME"
   exit 1
 fi
+
+cat_list_file="pftv2_cat_list-us.txt"
+echo "Checking for regional mapping, used to decide which pftv2_cat_list-<REGIONAL_MAPPING>.txt CAT list to use"
+if [[ -z "$REGIONAL_MAPPING" ]]
+then
+  echo "The environment variable REGIONAL_MAPPING was not set, so it will be set to 'us' by default."
+else
+  cat_list_file="pftv2_cat_list-$REGIONAL_MAPPING.txt"
+  echo "The environment variable REGIONAL_MAPPING was set to $REGIONAL_MAPPING. Checking for file $cat_list_file..."
+
+  if [[ ! -e "$cat_list_file" ]]
+  then
+    echo "CAT list file - $cat_list_file not found."
+    exit 1
+  fi
+fi
+
 
 export RIGHT_ST_LOGIN_ACCOUNT_ID=$ACCOUNT_ID
 export RIGHT_ST_LOGIN_ACOUNT_HOST=$SHARD_HOSTNAME
@@ -94,7 +113,7 @@ management_cat_launch_wait_terminate_delete() {
 if [[ "$options" == *"all"* || "$options" == *"cats"* ]]
 then
   echo "Upserting CAT and library files."
-  for i in `cat pftv2_cat_list-us.txt`
+  for i in `cat $cat_list_file`
   do
     cat_name=$(sed -n -e "s/^name[[:space:]]['\"]*\(.*\)['\"]/\1/p" $i)
     echo "Checking to see if ($cat_name - $i) has already been uploaded..."
@@ -117,8 +136,9 @@ then
   echo "Launching management CATs."
 
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Network Setup"
-  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux ServerTemplate Setup/Maintenance"
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux MCI Setup/Maintenance"
+  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux ServerTemplate Setup/Maintenance"
+  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT LAMP ServerTemplates Prerequisite Import"
 else
   echo "Skipping management CATs."
 fi
@@ -126,6 +146,27 @@ fi
 if [[ "$options" == *"all"* || "$options" == *"sts"* ]]
 then
   echo "Upserting ServerTemplates."
+  right_st server_templates/chef_server/*.yml
+  right_st server_templates/haproxy-chef12/*.yml
+  right_st server_templates/mysql-chef12/*.yml
+  right_st server_templates/php-chef12/*.yml
 else
   echo "Skipping ServerTemplates."
+fi
+
+if [[ "$options" == *"all"* || "$options" == *"creds"* ]]
+then
+  echo "Upserting Credentials."
+  existing=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index credentials "filter[]=name==PFT_RS_REFRESH_TOKEN")
+  if [[ -z "$existing" ]]
+  then
+    echo "PFT_RS_REFRESH_TOKEN Credential does not exist, creating it..."
+    rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 create credentials "credential[name]=PFT_RS_REFRESH_TOKEN" "credential[value]=$OAUTH_REFRESH_TOKEN"
+  else
+    echo "PFT_RS_REFRESH_TOKEN Credential already existed, updating it..."
+    existing_href=$(echo $existing | jq -r ".[0].links[].href")
+    rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 update $existing_href "credential[value]=$OAUTH_REFRESH_TOKEN"
+  fi
+else
+  echo "Skipping Credentials."
 fi
