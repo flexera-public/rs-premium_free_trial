@@ -20,8 +20,8 @@
 # It automatically imports the ServerTemplate it needs.
 
 # Required prolog
-name 'B) Corporate Standard Windows Server'
-rs_ca_ver 20160622
+name 'MITCH Corporate Standard Windows Server'
+rs_ca_ver 20161221
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/windows.png) 
 
 Get a Windows Server VM in a our supported public clouds."
@@ -36,6 +36,7 @@ import "pft/conditions"
 import "pft/server_templates_utilities"
 import "pft/cloud_utilities"
 import "pft/account_utilities"
+import "pft/err_utilities", as: "debug"
 
 ##################
 # User inputs    #
@@ -52,9 +53,8 @@ parameter "param_servertype" do
   label "Windows Server Type"
   type "list"
   allowed_values "Windows 2008R2",
-    "Windows 2012",
     "Windows 2012R2"
-  default "Windows 2008R2"
+  default "Windows 2012R2"
 end
 
 parameter "param_instancetype" do
@@ -137,20 +137,11 @@ mapping "map_st" do {
 # The off-the-shelf ServerTemplate being used has a couple of different MCIs defined based on the cloud.   
 mapping "map_mci" do {
   "Windows 2008R2" => {  # Same MCI for all 3 environments
-    "AWS" => "Windows_Server_Datacenter_2008R2_x64",
-    "AzureRM" => "Windows_Server_Datacenter_2008R2_x64",
-    "Google" => "Windows_Server_Datacenter_2008R2_x64"
+    "mci" => "PFT Windows_Server_2008R2_x64",
   },
-  "Windows 2012" => { # Different MCI for AWS vs ARM and not supported for Google so substituting an R2 version
-    "AWS" => "Windows_Server_Standard_2012_x64",
-    "AzureRM" => "Windows_Server_Datacenter_2012_x64",
-    "Google" => "Windows_Server_Datacenter_2012R2_x64"
-  },
-  "Windows 2012R2" => {
-    "AWS" => "Windows_Server_Standard_2012R2_x64",
-    "AzureRM" => "Windows_Server_Datacenter_2012R2_x64",
-    "Google" => "Windows_Server_Datacenter_2012R2_x64"
-  },
+  "Windows 2012R2" => { # Different MCI for AWS vs ARM and not supported for Google so substituting an R2 version
+    "mci" => "PFT Windows_Server_2012R2_x64",
+  }
 } end
 
 ##################
@@ -184,7 +175,7 @@ end
 ############################
 
 ### Server Definition ###
-resource "windows_server", type: "server" do
+resource "windows_server", type: "server", provision: "provision_server" do
   name join(['win',last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
@@ -197,6 +188,16 @@ resource "windows_server", type: "server" do
   security_group_hrefs map($map_cloud, $param_location, "sg")  
   placement_group_href map($map_cloud, $param_location, "pg")
 end
+
+define provision_server(@windows_server) return @windows_server do
+  # Check to make sure the underlying cloud has not deprecated the image being used.
+  # If so, find the latest applicable image and use that instead.
+  $mci_href = @windows_server.multi_cloud_image_href
+  $server_hash = to_object(@windows_server)
+  
+  call debug.log("MCI HREF: "+$mci_href, to_s($server_hash))
+end
+  
 
 ### Security Group Definitions ###
 # Note: Even though not all environments need or use security groups, the launch operation/definition will decide whether or not
