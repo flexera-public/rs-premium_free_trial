@@ -53,10 +53,11 @@ parameter "param_costcenter" do
   like $parameters.param_costcenter
 end
 
-parameter "param_appcode" do
-  like $lamp_parameters.param_appcode
-  operations "update_app_code"
-end
+# Commented out until the install_appcode definition is updated
+#parameter "param_appcode" do
+#  like $lamp_parameters.param_appcode
+#  operations "update_app_code"
+#end
 
 parameter "param_chef_password" do
   like $lamp_parameters.param_chef_password
@@ -214,11 +215,12 @@ operation "terminate" do
   definition "lamp_utilities.delete_resources"
 end
 
-operation "update_app_code" do
-  label "Update Application Code"
-  description "Select and install a different repo and branch of code."
-  definition "lamp_utilities.install_appcode"
-end
+# Commented out until the install_appcode definition is updated
+#operation "update_app_code" do
+#  label "Update Application Code"
+#  description "Select and install a different repo and branch of code."
+#  definition "lamp_utilities.install_appcode"
+#end
 
 operation "scale_out" do
   label "Scale Out"
