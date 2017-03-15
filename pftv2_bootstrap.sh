@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-# TODO: test and publish them
+# TODO: create schedules, test and publish cats
+# A help option that'll print a useful usage message
 if [[ "$*" == *"help"* ]]
 then
   echo "Usage: pftv2_bootstrap.sh [options]"
@@ -12,18 +13,25 @@ then
   echo "    creds - Upserts the PFT_RS_REFRESH_TOKEN credential with the value provided in OAUTH_REFRESH_TOKEN"
 fi
 
+# By default, the script will perform "all" actions.
 options="all"
 if [[ -n "$*" ]]
 then
   options=$*
 fi
 
+# Check for required environment variables
 if [[ -z "$OAUTH_REFRESH_TOKEN" || -z "$ACCOUNT_ID" || -z "$SHARD_HOSTNAME" ]]
 then
   echo "The following environment variables must be set. OAUTH_REFRESH_TOKEN, ACCOUNT_ID, SHARD_HOSTNAME"
   exit 1
 fi
+export RIGHT_ST_LOGIN_ACCOUNT_ID=$ACCOUNT_ID
+export RIGHT_ST_LOGIN_ACCOUNT_HOST=$SHARD_HOSTNAME
+export RIGHT_ST_LOGIN_ACCOUNT_REFRESH_TOKEN=$OAUTH_REFRESH_TOKEN
 
+# Set a default (US) regional mapping, and check to see if the user specified an
+# alternative mapping.
 cat_list_file="pftv2_cat_list-us.txt"
 echo "Checking for regional mapping, used to decide which pftv2_cat_list-<REGIONAL_MAPPING>.txt CAT list to use"
 if [[ -z "$REGIONAL_MAPPING" ]]
@@ -40,11 +48,7 @@ else
   fi
 fi
 
-
-export RIGHT_ST_LOGIN_ACCOUNT_ID=$ACCOUNT_ID
-export RIGHT_ST_LOGIN_ACCOUNT_HOST=$SHARD_HOSTNAME
-export RIGHT_ST_LOGIN_ACCOUNT_REFRESH_TOKEN=$OAUTH_REFRESH_TOKEN
-
+# The RSC tool is required, check for it.
 hasrsc=$(which rsc)
 if [[ $? != 0 ]]
 then
@@ -52,6 +56,7 @@ then
   exit 1
 fi
 
+# The JQ tool is required, check for it.
 hasjq=$(which jq)
 if [[ $? != 0 ]]
 then
@@ -59,11 +64,28 @@ then
   exit 1
 fi
 
+# The right_st tool is required, check for it.
 hasrightst=$(which right_st)
 if [[ $? != 0 ]]
 then
   echo "The binary 'right_st' must be installed - https://github.com/rightscale/right_st"
   exit 1
+fi
+
+# Finally, if STS import is specified, and the Chef Server isn't already imported
+# notify the user. They'll need to import it manually, since it requires accepting
+# an EULA and can not be imported programatically.
+if [[ "$options" == *"all"* || "$options" == *"sts"* ]]
+then
+  echo "Checking for Chef Server Template. This is a prerequsite to importing the ServerTemplates."
+  chef_server_response=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index server_templates "filter[]=name==Chef Server for Linux (RightLink 10)" "filter[]=revision==10")
+  if [[ -z "$chef_server_response" ]]
+  then
+    echo "We need you to complete one manual step first. Go import the Chef Server for Linux (RightLink 10) and accept the EULA. Here's a handy link - http://www.rightscale.com/library/server_templates/Chef-Server-for-Linux-RightLin/lineage/57238"
+    exit 1
+  else
+    echo "Chef Server Template found!"
+  fi
 fi
 
 # Requires parameters.
@@ -110,6 +132,7 @@ management_cat_launch_wait_terminate_delete() {
   fi
 }
 
+# Import CATs step.
 if [[ "$options" == *"all"* || "$options" == *"cats"* ]]
 then
   echo "Upserting CAT and library files."
@@ -131,6 +154,7 @@ else
   echo "Skipping CAT and library upsert."
 fi
 
+# Launch Management CATs step
 if [[ "$options" == *"all"* || "$options" == *"management"* ]]
 then
   echo "Launching management CATs."
@@ -151,6 +175,7 @@ else
   echo "Skipping management CATs."
 fi
 
+# Right_ST upload ServerTemplates step
 if [[ "$options" == *"all"* || "$options" == *"sts"* ]]
 then
   echo "Upserting ServerTemplates."
@@ -162,6 +187,7 @@ else
   echo "Skipping ServerTemplates."
 fi
 
+# Set PFT_RS_REFRESH_TOKEN step
 if [[ "$options" == *"all"* || "$options" == *"creds"* ]]
 then
   echo "Upserting Credentials."
