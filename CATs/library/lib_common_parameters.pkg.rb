@@ -8,7 +8,7 @@ parameter "param_location" do
   category "Deployment Options"
   label "Cloud" 
   type "string" 
-  allowed_values "AWS", "Azure", "AzureRM", "Google", "VMware" 
+  allowed_values "AWS", "AzureRM", "Google", "VMware" 
   default "Google"
 end
 
