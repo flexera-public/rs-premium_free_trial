@@ -25,9 +25,9 @@ parameter "param_starting_st" do
   default "RightLink 10.6.0 Windows Base"
 end
 
-mapping "map_mci_info" do {
+mapping "map_mci_info" do 
   like $windows_mappings.map_mci_info
-} end
+end
 
 operation "launch" do
   description "Manage the ST"
@@ -63,7 +63,7 @@ define manage_st($param_starting_st, $map_mci_info) do
   
   # Check that the official PFT Base MCIs are available in the account
   foreach $os in keys($map_mci_info) do
-    $custom_mci = $map_mci_info, $os, "custom_mci_name")
+    $custom_mci = map($map_mci_info, $os, "custom_mci_name")
     call mci.find_mci($custom_mci) retrieve @pft_mci
     if empty?(@pft_mci)
       raise "Cloud not find MCI, " + $custom_mci + "in the Account. Be sure to run the MCI Setup CAT."

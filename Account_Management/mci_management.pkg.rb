@@ -35,13 +35,12 @@ end
 # If not, it creates one of the given name.
 # It then updates the images pointed to by the MCI by finding the applicable image as per the Image Name mapping and the
 # Cloud mapping.
-define mci_setup($os, $map_mci_info, $map_image_name_root, $map_cloud) do
+define mci_setup($os, $map_mci_info, $map_image_name_root, $map_cloud) return @mci do
   
-
   # Name of the custom MCI we are creating/updating
   $mci_name = map($map_mci_info, $os, "custom_mci_name")
   
-  call debug.log("mci_setup - os: "+$os+"; mci: "+$mci_name, "")
+  #call debug.log("mci_setup - os: "+$os+"; mci: "+$mci_name, "")
 
   # Check if the MCI already exists
   call find_mci($mci_name) retrieve @mci
@@ -81,19 +80,19 @@ define mci_setup($os, $map_mci_info, $map_image_name_root, $map_cloud) do
         $regexp_extension = gsub($regexp_extension, "\]", "")
        
         # Find images that match the given base name.
-        call debug.log("mci_setup - base_image_name: "+$base_image_name, "")
+        #call debug.log("mci_setup - base_image_name: "+$base_image_name, "")
         @images = @cloud.images(filter: ["name=="+$base_image_name])  # partial match
         
         # Filter these results using any provided trailing regular expression
         $base_image_selector = "/^"+$base_image_name+$regexp_extension+"$/"
-        call debug.log("mci_setup - base_image_selector: "+$base_image_selector, "")
+        #call debug.log("mci_setup - base_image_selector: "+$base_image_selector, "")
         
         @image = last(select(@images, { "name": $base_image_selector }))
           
         $image_href = @image.href
         $cloud_href = @cloud.href
        
-        call debug.log("mci_setup - cloud_href: " + to_s($cloud_href) + ", image_href: "+ to_s($image_href), "resources: " + to_s(@image) + " : "+to_s(@cloud))
+        #call debug.log("mci_setup - cloud_href: " + to_s($cloud_href) + ", image_href: "+ to_s($image_href), "resources: " + to_s(@image) + " : "+to_s(@cloud))
 
         call mci_upsert_cloud_image(@mci, $cloud_href, $image_href)
       end
@@ -105,14 +104,14 @@ end
 # Update an MCI to point to a new image for a given cloud, or add an image to
 # for a cloud which was not previously supported.
 define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
-  call debug.log("mci_upsert_cloud_image - cloud_href: " + to_s($cloud_href) + ", image_href: "+ to_s($image_href), "")
+  #call debug.log("mci_upsert_cloud_image - cloud_href: " + to_s($cloud_href) + ", image_href: "+ to_s($image_href), "")
   $updated = false
   # update the MCI setting to point to a given cloud image.
   @mci_settings = @mci.settings()
   foreach @setting in @mci_settings do
     sub on_error: skip do  # There may be cloud() links in the collection that are undefined in the account.
       if @setting.cloud().href == $cloud_href
-        call debug.log("mci_upsert_cloud_image - updating existing cloud image reference in MCI", "")
+        #call debug.log("mci_upsert_cloud_image - updating existing cloud image reference in MCI", "")
         @setting.update(multi_cloud_image_setting: {image_href: $image_href})
         $updated = true
       end
@@ -123,7 +122,7 @@ define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
   @mci_setting = @mci.settings(filter: ["cloud_href=="+$cloud_href])
   call debug.log("mci_upsert_cloud- mci: " + to_s(@mci.href) + ", mci_setting: ", to_s(@mci_setting))
   if (size(@mci_setting) == 0)
-    call debug.log("mci_upsert_cloud_image - adding cloud image reference to MCI", "")
+    #call debug.log("mci_upsert_cloud_image - adding cloud image reference to MCI", "")
     @cloud = rs_cm.get(href: $cloud_href)
 
     @instance_types = @cloud.instance_types()

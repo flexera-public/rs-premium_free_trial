@@ -46,8 +46,10 @@ end
 
 define manage_mci($map_mci_info, $map_image_name_root, $map_cloud) do
 
-  call mci.mci_setup("2008R2", $map_mci_info, $map_image_name_root, $map_cloud)
-  call mci.mci_setup("2012R2", $map_mci_info, $map_image_name_root, $map_cloud)
-
+  call mci.mci_setup("2008R2", $map_mci_info, $map_image_name_root, $map_cloud) retrieve @win2008mci
+  call mci.mci_setup("2012R2", $map_mci_info, $map_image_name_root, $map_cloud) retrieve @win2012mci
+  # Make sure the install-at-boot tags are set up on the MCI
+  rs_cm.tags.multi_add(resource_hrefs: [@win2008mci.href, @win2012mci.href], tags: ["rs_agent:powershell_url=https://rightlink.rightscale.com/rll/10/rightlink.boot.ps1", "rs_agent:type=right_link_lite"])
+  
 end
 

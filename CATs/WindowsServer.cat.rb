@@ -27,7 +27,7 @@ short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/windows.png
 Get a Windows Server VM in a our supported public clouds."
 long_description "Allows you to select different windows server types and cloud and performance level you want.\n
 \n
-Clouds Supported: <B>AWS, Azure</B>"
+Clouds Supported: <B>AWS, AzureRM, Google</B>"
 
 import "pft/parameters"
 import "pft/mappings"
@@ -129,7 +129,7 @@ end
 
 mapping "map_st" do {
   "windows_server" => {
-    "name" => "RightLink 10.6.0 Windows Base",
+    "name" => "PFT Base Windows ServerTemplate",
     "rev" => "latest",
   },
 } end
@@ -175,7 +175,7 @@ end
 ############################
 
 ### Server Definition ###
-resource "windows_server", type: "server", provision: "provision_server" do
+resource "windows_server", type: "server" do
   name join(['win',last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
@@ -187,15 +187,6 @@ resource "windows_server", type: "server", provision: "provision_server" do
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   security_group_hrefs map($map_cloud, $param_location, "sg")  
   placement_group_href map($map_cloud, $param_location, "pg")
-end
-
-define provision_server(@windows_server) return @windows_server do
-  # Check to make sure the underlying cloud has not deprecated the image being used.
-  # If so, find the latest applicable image and use that instead.
-  $mci_href = @windows_server.multi_cloud_image_href
-  $server_hash = to_object(@windows_server)
-  
-  call debug.log("MCI HREF: "+$mci_href, to_s($server_hash))
 end
   
 
