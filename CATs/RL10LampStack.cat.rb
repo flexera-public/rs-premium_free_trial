@@ -22,7 +22,7 @@
 # User can use a post-launch action to install a different version of the application software from a Git repo.
 
 
-name 'RL10 LAMP Stack'
+name 'F) LAMP Stack (with Chef Server)'
 rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/lamp_icon.png)
 

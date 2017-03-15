@@ -144,6 +144,8 @@ then
   fi
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux MCI Setup/Maintenance"
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux ServerTemplate Setup/Maintenance"
+  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Windows MCI Setup/Maintenance"
+  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Windows ServerTemplate Setup/Maintenance"
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT LAMP ServerTemplates Prerequisite Import"
 else
   echo "Skipping management CATs."
