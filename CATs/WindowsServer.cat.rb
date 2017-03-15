@@ -20,7 +20,7 @@
 # It automatically imports the ServerTemplate it needs.
 
 # Required prolog
-name 'MITCH Corporate Standard Windows Server'
+name 'B) Corporate Standard Windows Server'
 rs_ca_ver 20161221
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/windows.png) 
 
