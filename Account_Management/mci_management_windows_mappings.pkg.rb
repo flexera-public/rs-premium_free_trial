@@ -19,17 +19,17 @@ mapping "map_mci_info" do {
 # Mappings of image name for each of the support clouds.
 # A rudimentary regexp capability is supported to help narrow down the image to use.
 # The assumption is that the given image name root is searched with leading and trailing anchors: /^STRING$/.
-# However, you can add a trailing regexp, in square brackets [ ], to handle cases where the name changes over time.
+# However, you can add a trailing regexp, in delineated by open and closing arrows, "<< >>", to handle cases where the name changes over time.
 # Note the need to escape any backslashes.
 mapping "map_image_name_root" do {
   "2008R2" => {
-    "AWS" => "Windows_Server-2008-R2_SP1-English-64Bit-Base-[\\d{4}\\.\\d{2}\\.\\d{2}]",
+    "AWS" => "Windows_Server-2008-R2_SP1-English-64Bit-Base-<<\\d{4}\\.\\d{2}\\.\\d{2}>>",
     "AzureRM" => "MicrosoftWindowsServer WindowsServer 2008-R2-SP1 latest",
-    "Google" => "windows-server-2008-r2-dc-v[\\d{8}]",
+    "Google" => "windows-server-2008-r2-dc-v<<\\d{8}>>",
   },
   "2012R2" => {
-    "AWS" => "Windows_Server-2012-R2_RTM-English-64Bit-Base-[\\d{4}\\.\\d{2}\\.\\d{2}]",
+    "AWS" => "Windows_Server-2012-R2_RTM-English-64Bit-Base-<<\\d{4}\\.\\d{2}\\.\\d{2}>>",
     "AzureRM" => "MicrosoftWindowsServer WindowsServer 2012-R2-Datacenter latest",
-    "Google" => "windows-server-2012-r2-dc-v[\\d{8}]",
+    "Google" => "windows-server-2012-r2-dc-v<<\\d{8}>>",
   },
 } end
