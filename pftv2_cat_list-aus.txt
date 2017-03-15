@@ -13,7 +13,7 @@ CATs/library/lib_util_serverarray.pkg.rb
 CATs/library/lib_util_clouds.pkg.rb
 CATs/library/lib_util_creds.pkg.rb
 CATs/library/lib_util_LAMP_rl10.pkg.rb
-Account_Management/mci_windows_mappings.pkg.rb
+Account_Management/mci_management_windows_mappings.pkg.rb
 Account_Management/mci_management.pkg.rb
 Account_Management/network_management.cat.rb
 Account_Management/mci_management_base_linux.cat.rb
