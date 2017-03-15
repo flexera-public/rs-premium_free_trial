@@ -8,10 +8,12 @@ This CAT is used to import the prerequisites for the ServerTemplates used by the
 import "pft/server_templates_utilities", as: "st"
 
 mapping "map_st" do {
-  "chef" => {
-    "name" => "Chef Server for Linux (RightLink 10)",
-    "rev" => "10"
-  },
+  # This one requires accepting a EULA so it will result in a 500 when you
+  # import progamatically. Need to do this one manually.
+  # "chef" => {
+  #   "name" => "Chef Server for Linux (RightLink 10)",
+  #   "rev" => "10"
+  # },
   "db" => {
     "name" => "Database Manager for MySQL for Chef Server (RightLink 10)",
     "rev" => "14"
