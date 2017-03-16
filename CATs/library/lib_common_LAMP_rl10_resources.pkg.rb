@@ -65,7 +65,7 @@ resource 'lb_server', type: 'server' do
     'LOG_LEVEL' => 'text::info',
     'MANAGED_LOGIN' => 'text:auto',
     'MONITORING_METHOD' => 'text:auto',
-    'POOLS' => 'array:["text:pft"]',
+    'POOLS' => join(['array:["text:pft_',last(split(@@deployment.href,"/")),'"]']),
     'SCHEDULE_ENABLE' => 'text:true',
     'SCHEDULE_INTERVAL' => 'text:15',
     'SESSION_STICKINESS' => 'text:true',
@@ -89,7 +89,7 @@ resource 'db_server', type: 'server' do
     'DB_BACKUP_KEEP_MONTHLIES' => 'text:12',
     'DB_BACKUP_KEEP_WEEKLIES' => 'text:14',
     'DB_BACKUP_KEEP_YEARLIES' => 'text:2',
-    'DB_BACKUP_LINEAGE' => 'text:pft',
+    'DB_BACKUP_LINEAGE' => join(['text:pft_',last(split(@@deployment.href,"/"))]),
     'BIND_NETWORK_INTERFACE' => 'text:private',
     'CHEF_ENVIRONMENT' => 'text:_default',
     'CHEF_SERVER_SSL_CERT' => join(['cred:PFT-LAMP-ChefCert-',last(split(@@deployment.href,"/"))]),
@@ -135,7 +135,7 @@ resource 'app_server', type: 'server_array' do
   network map($map_cloud, $param_location, "network")
   subnets [map($map_cloud, $param_location, "subnet")]
   inputs do {
-    'APPLICATION_NAME' => 'text:pft',
+    'APPLICATION_NAME' => join(['text:pft_',last(split(@@deployment.href,"/"))]),
     'APPLICATION_ROOT_PATH' => 'text:pft',
     'BIND_NETWORK_INTERFACE' => 'text:private',
     'CHEF_ENVIRONMENT' => 'text:_default',
