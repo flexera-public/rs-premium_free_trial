@@ -61,27 +61,6 @@ parameter "param_instancetype" do
   like $parameters.param_instancetype
 end
 
-#parameter "param_username" do 
-#  category "User Inputs"
-#  label "Windows Username" 
-##  description "Username (will be created)."
-#  type "string" 
-#  no_echo "false"
-#end
-
-#parameter "param_password" do 
-#  category "User Inputs"
-#  label "Windows Password" 
-#  description "Minimum at least 8 characters and must contain at least one of each of the following: 
-#  Uppercase characters, Lowercase characters, Digits 0-9, Non alphanumeric characters [@#\$%^&+=]." 
-#  type "string" 
-#  min_length 8
-#  max_length 32
-#  # This enforces a stricter windows password complexity in that all 4 elements are required as opposed to just 3.
-#  allowed_pattern '(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=])'
-#  no_echo "true"
-#end
-
 parameter "param_costcenter" do 
   category "User Inputs"
   like $parameters.param_costcenter
@@ -182,7 +161,7 @@ resource "windows_server", type: "server" do
   network find(map($map_cloud, $param_location, "network"))
   subnets find(map($map_cloud, $param_location, "subnet"))
   server_template_href find(map($map_st, "windows_server", "name"))
-  multi_cloud_image find(map($map_mci, $param_servertype, $param_location))
+  multi_cloud_image_href find(map($map_mci, $param_servertype, "mci"))
   instance_type map($map_instancetype, $param_instancetype, $param_location)
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   security_group_hrefs map($map_cloud, $param_location, "sg")  
@@ -263,9 +242,6 @@ define pre_auto_launch($map_cloud, $param_location, $map_st) do
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
   call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
-  
-  # Find and import the server template - just in case it hasn't been imported to the account already
-  call server_templates_utilities.importServerTemplate($map_st)
 
 end
 
