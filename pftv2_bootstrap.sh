@@ -191,16 +191,17 @@ fi
 if [[ "$options" == *"all"* || "$options" == *"creds"* ]]
 then
   echo "Upserting Credentials."
-  existing=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index credentials "filter[]=name==PFT_RS_REFRESH_TOKEN")
-  if [[ -z "$existing" ]]
-  then
-    echo "PFT_RS_REFRESH_TOKEN Credential does not exist, creating it..."
-    rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 create credentials "credential[name]=PFT_RS_REFRESH_TOKEN" "credential[value]=$OAUTH_REFRESH_TOKEN"
-  else
-    echo "PFT_RS_REFRESH_TOKEN Credential already existed, updating it..."
-    existing_href=$(echo $existing | jq -r ".[0].links[].href")
-    rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 update $existing_href "credential[value]=$OAUTH_REFRESH_TOKEN"
-  fi
+  echo "WARNING: On second thought, this is probably a pretty dangerous idea, since refresh tokens must be account specific for now. Please make sure that a valid PFT_RS_REFRESH_TOKEN credential exists. We'll automate this eventually."
+  # existing=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index credentials "filter[]=name==PFT_RS_REFRESH_TOKEN")
+  # if [[ -z "$existing" ]]
+  # then
+  #   echo "PFT_RS_REFRESH_TOKEN Credential does not exist, creating it..."
+  #   rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 create credentials "credential[name]=PFT_RS_REFRESH_TOKEN" "credential[value]=$OAUTH_REFRESH_TOKEN"
+  # else
+  #   echo "PFT_RS_REFRESH_TOKEN Credential already existed, updating it..."
+  #   existing_href=$(echo $existing | jq -r ".[0].links[].href")
+  #   rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 update $existing_href "credential[value]=$OAUTH_REFRESH_TOKEN"
+  # fi
 else
   echo "Skipping Credentials."
 fi
