@@ -133,25 +133,6 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
     end
   end
 
-  # I don't think any of these are necessary with the new Chef template(s)
-  # concurrent do
-  #   # Import a test database
-  #   call server_templates_utilities.run_recipe_no_inputs(@db_server, "rs-mysql::dump_import")  # applicable inputs were set at launch
-  #
-  #   # Set up the tags for the load balancer and app servers to find each other.
-  #   call server_templates_utilities.run_recipe_no_inputs(@lb_server, "rs-haproxy::tags")
-  #   call server_templates_utilities.run_recipe_no_inputs(@app_server, "rs-application_php::tags")
-  #
-  #   # Due to the concurrent launch above, it's possible the app server came up before the DB server and wasn't able to connect.
-  #   # So, we re-run the application setup script to force it to connect.
-  #   call server_templates_utilities.run_recipe_no_inputs(@app_server, "rs-application_php::default")
-  # end
-
-  # Now that all the servers are good to go, tell the LB to find the app server.
-  # This must run after the tagging is complete, so it is done outside the concurrent block above.
-  #call server_templates_utilities.run_recipe_no_inputs(@lb_server, "rs-haproxy::frontend")
-  call server_templates_utilities.run_script_no_inputs(@lb_server, "HAProxy Frontend - chef")
-
   # Now tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
   rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
