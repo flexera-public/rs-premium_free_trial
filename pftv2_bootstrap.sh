@@ -11,6 +11,7 @@ then
   echo "    sts - Upserts all ServerTemplates"
   echo "    management - Launches management CATs for creating networks, MCI, and STs"
   echo "    creds - Upserts the PFT_RS_REFRESH_TOKEN credential with the value provided in OAUTH_REFRESH_TOKEN"
+  echo "    schedule - Creates a 'Business Hours' CAT schedule"
 fi
 
 # By default, the script will perform "all" actions.
@@ -135,15 +136,15 @@ then
     cat_filename=$(echo $i | sed -e "s/CAT_LIST_MODIFIER/$CAT_LIST_MODIFIER/g")
     cat_name=$(sed -n -e "s/^name[[:space:]]['\"]*\(.*\)['\"]/\1/p" $cat_filename)
     echo "Checking to see if ($cat_name - $cat_filename) has already been uploaded..."
-    # cat_href=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss index collections/$ACCOUNT_ID/templates "filter[]=name==$cat_name" | jq -r '.[0].href')
-    # if [[ -z "$cat_href" ]]
-    # then
-    #   echo "($cat_name - $i) not already uploaded, creating it now..."
-    #   rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss create collections/$ACCOUNT_ID/templates source=$i
-    # else
-    #   echo "($cat_name - $i) already uploaded, updating it now..."
-    #   rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss update $cat_href source=$i
-    # fi
+    cat_href=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss index collections/$ACCOUNT_ID/templates "filter[]=name==$cat_name" | jq -r '.[0].href')
+    if [[ -z "$cat_href" ]]
+    then
+      echo "($cat_name - $i) not already uploaded, creating it now..."
+      rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss create collections/$ACCOUNT_ID/templates source=$i
+    else
+      echo "($cat_name - $i) already uploaded, updating it now..."
+      rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss update $cat_href source=$i
+    fi
   done
 else
   echo "Skipping CAT and library upsert."
@@ -199,4 +200,23 @@ then
   # fi
 else
   echo "Skipping Credentials."
+fi
+
+# Create Business Hours schedule
+if [[ "$options" == *"all"* || "$options" == *"schedule"* ]]
+then
+  echo "Checking for Business Hours Schedule."
+
+  schedules_json=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss index /designer/collections/$ACCOUNT_ID/schedules)
+  if [[ -z "$schedules_json" || -z "$(echo $schedules_json | rsc --xm ':has(.name:val("Business Hours")) > .id' json)" ]]
+  then
+    echo "Creating Business Hours Schedule..."
+    schedule_create=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss create /designer/collections/$ACCOUNT_ID/schedules "name=Business Hours" "start_recurrence[hour]=8" "start_recurrence[minute]=0" "start_recurrence[rule]=FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" "stop_recurrence[hour]=18" "stop_recurrence[minute]=0" "stop_recurrence[rule]=FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR")
+    echo $schedule_create
+  else
+    echo "Business Hours schedule already exists, not creating it."
+  fi
+
+else
+  echo "Skipping Business Hours Schedule."
 fi
