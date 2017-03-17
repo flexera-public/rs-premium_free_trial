@@ -139,11 +139,11 @@ then
     cat_href=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss index collections/$ACCOUNT_ID/templates "filter[]=name==$cat_name" | jq -r '.[0].href')
     if [[ -z "$cat_href" ]]
     then
-      echo "($cat_name - $i) not already uploaded, creating it now..."
-      rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss create collections/$ACCOUNT_ID/templates source=$i
+      echo "($cat_name - $cat_filename) not already uploaded, creating it now..."
+      rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss create collections/$ACCOUNT_ID/templates source=$cat_filename
     else
-      echo "($cat_name - $i) already uploaded, updating it now..."
-      rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss update $cat_href source=$i
+      echo "($cat_name - $cat_filename) already uploaded, updating it now..."
+      rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss update $cat_href source=$cat_filename
     fi
   done
 else
