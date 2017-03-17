@@ -32,20 +32,14 @@ export RIGHT_ST_LOGIN_ACCOUNT_REFRESH_TOKEN=$OAUTH_REFRESH_TOKEN
 
 # Set a default (US) regional mapping, and check to see if the user specified an
 # alternative mapping.
-cat_list_file="pftv2_cat_list-us.txt"
-echo "Checking for regional mapping, used to decide which pftv2_cat_list-<REGIONAL_MAPPING>.txt CAT list to use"
-if [[ -z "$REGIONAL_MAPPING" ]]
+cat_list_file="pftv2_cat_list.txt"
+echo "Checking for CAT_LIST_MODIFIER, used to replace the token CAT_LIST_MODIFIER in the pftv2_cat_list.txt file. Useful for alternate configs such as region specific mappings."
+if [[ -z "$CAT_LIST_MODIFIER" ]]
 then
-  echo "The environment variable REGIONAL_MAPPING was not set, so it will be set to 'us' by default."
+  echo "The environment variable CAT_LIST_MODIFIER was not set, so it will be set to 'default'."
+  export CAT_LIST_MODIFIER='default'
 else
-  cat_list_file="pftv2_cat_list-$REGIONAL_MAPPING.txt"
-  echo "The environment variable REGIONAL_MAPPING was set to $REGIONAL_MAPPING. Checking for file $cat_list_file..."
-
-  if [[ ! -e "$cat_list_file" ]]
-  then
-    echo "CAT list file - $cat_list_file not found."
-    exit 1
-  fi
+  echo "The environment variable CAT_LIST_MODIFIER was set to $CAT_LIST_MODIFIER..."
 fi
 
 # The RSC tool is required, check for it.
@@ -138,17 +132,18 @@ then
   echo "Upserting CAT and library files."
   for i in `cat $cat_list_file`
   do
-    cat_name=$(sed -n -e "s/^name[[:space:]]['\"]*\(.*\)['\"]/\1/p" $i)
-    echo "Checking to see if ($cat_name - $i) has already been uploaded..."
-    cat_href=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss index collections/$ACCOUNT_ID/templates "filter[]=name==$cat_name" | jq -r '.[0].href')
-    if [[ -z "$cat_href" ]]
-    then
-      echo "($cat_name - $i) not already uploaded, creating it now..."
-      rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss create collections/$ACCOUNT_ID/templates source=$i
-    else
-      echo "($cat_name - $i) already uploaded, updating it now..."
-      rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss update $cat_href source=$i
-    fi
+    cat_filename=$(echo $i | sed -e "s/CAT_LIST_MODIFIER/$CAT_LIST_MODIFIER/g")
+    cat_name=$(sed -n -e "s/^name[[:space:]]['\"]*\(.*\)['\"]/\1/p" $cat_filename)
+    echo "Checking to see if ($cat_name - $cat_filename) has already been uploaded..."
+    # cat_href=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss index collections/$ACCOUNT_ID/templates "filter[]=name==$cat_name" | jq -r '.[0].href')
+    # if [[ -z "$cat_href" ]]
+    # then
+    #   echo "($cat_name - $i) not already uploaded, creating it now..."
+    #   rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss create collections/$ACCOUNT_ID/templates source=$i
+    # else
+    #   echo "($cat_name - $i) already uploaded, updating it now..."
+    #   rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss update $cat_href source=$i
+    # fi
   done
 else
   echo "Skipping CAT and library upsert."
