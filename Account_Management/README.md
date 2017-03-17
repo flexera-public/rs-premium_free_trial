@@ -8,6 +8,8 @@ Account Set Up Steps
         Cloud Management Menu: Settings -> Accounts -> API Credentials
     For PFTs, see the PFT wookiee for the service account user to use for this.
 - Import the "Chef Server for Linux (RightLink 10)" ServerTemplate (lineage: 57238).
+    You need to accept the EULA - hence it can't be automated at this time.
+    ST URL: https://my.rightscale.com/library/server_templates/Chef-Server-for-Linux-RightLin/lineage/57238
 - Run the pftv2_bootstrap.sh script 
     This script will execute all the steps to prep the account and upload the CATs
 - Check Self Service catalog.
