@@ -51,6 +51,8 @@ define setup_networks(@base_network) do
 
   # Find the clouds attached to the account
   @arm_clouds = rs_cm.clouds.get(filter: ["cloud_type==azure_v2"])
+    
+  #call debug.log("NETWORK SETUP: Found "+size(@current_pft_arm_networks)+" existing PFT networks; Found "+size(@arm_clouds)+" attached ARM clouds", "")
 
   concurrent foreach @arm_cloud in @arm_clouds do
     $arm_cloud_href = @arm_cloud.href
@@ -59,9 +61,10 @@ define setup_networks(@base_network) do
       $new_network["fields"]["cloud_href"] = $arm_cloud_href
       $new_network["fields"]["deployment_href"] = null
       @new_network = $new_network
-      sub on_error: skip do  # Silently fail, this is for idempotency. I.E. The network already exists.
-        provision(@new_network)
-      end
+      call debug.log("NETWORK SETUP: Provisioning pft_arm_network in cloud: "+$arm_cloud_href, to_s(to_object(@new_network)))
+      provision(@new_network)
     end
   end
 end
+
+
