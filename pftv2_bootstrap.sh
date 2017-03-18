@@ -12,6 +12,7 @@ then
   echo "    management - Launches management CATs for creating networks, MCI, and STs"
   echo "    creds - Upserts the PFT_RS_REFRESH_TOKEN credential with the value provided in OAUTH_REFRESH_TOKEN"
   echo "    schedule - Creates a 'Business Hours' CAT schedule"
+  echo "    publish - Publishes the CATs to the Self-Service catalog with the \"Business Hours\" (and \"Always On\") schedules."
 fi
 
 # By default, the script will perform "all" actions.
