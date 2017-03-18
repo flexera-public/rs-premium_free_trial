@@ -11,7 +11,7 @@ permission "pft_general_permissions" do
   actions   "rs_cm.*"
 end
 
-permission "manage_credentials" do
-  resources "rs_cm.credentials"
-  actions "rs_cm.*", "rs_cm.index_sensitive", "rs_cm.show_sensitive"
+permission "pft_sensitive_views" do
+  resources "rs_cm.credentials" # Currently these actions are not support for instance resources, "rs_cm.instances"
+  actions "rs_cm.index_sensitive", "rs_cm.show_sensitive"
 end

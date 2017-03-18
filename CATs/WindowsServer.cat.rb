@@ -47,9 +47,9 @@ permission "pft_general_permissions" do
   like $permissions.pft_general_permissions
 end
 
-permission "manage_credentials" do
-  like $permissions.manage_credentials
-endd
+permission "pft_sensitive_views" do
+  like $permissions.pft_sensitive_views
+end
 
 ##################
 # User inputs    #
