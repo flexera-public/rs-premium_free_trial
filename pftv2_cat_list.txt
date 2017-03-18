@@ -3,14 +3,14 @@ CATs/library/lib_common_permissions.pkg.rb
 CATs/library/lib_util_servertemplates.pkg.rb
 CATs/library/lib_util_account.pkg.rb
 CATs/library/lib_common_LAMP_rl10_outputs.pkg.rb
-CATs/library/lib_common_outputs.pkg.rb
 CATs/library/lib_common_parameters.pkg.rb
+CATs/library/lib_common_conditions.pkg.rb
+CATs/library/lib_common_outputs.pkg.rb
 CATs/library/lib_common_LAMP_rl10_parameters.pkg.rb
 CATs/library/lib_common_LAMP_parameters.pkg.rb
 CATs/library/lib_common_mappings.CAT_LIST_MODIFIER.pkg.rb
 CATs/library/lib_common_LAMP_rl10_mappings.pkg.rb
 CATs/library/lib_common_LAMP_mappings.pkg.rb
-CATs/library/lib_common_conditions.pkg.rb
 CATs/library/lib_common_resources.pkg.rb
 CATs/library/lib_common_LAMP_rl10_resources.pkg.rb
 CATs/library/lib_common_LAMP_resources.pkg.rb
