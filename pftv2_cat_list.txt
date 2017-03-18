@@ -32,5 +32,5 @@ CATs/LinuxServer.cat.rb
 CATs/WindowsServer.cat.rb
 CATs/RL10LampStack.cat.rb
 CATs/LampStack-LeastExpensiveCloud.cat.rb
-CATs/RancherCluster.cat.rb
 CATs/DockerWordpress.cat.rb
+CATs/RancherCluster.cat.rb

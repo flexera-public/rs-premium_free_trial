@@ -43,9 +43,13 @@ import "pft/permissions"
 ##################
 # Permissions    #
 ##################
-permission "pft_permissions" do
-  like $permissions.pft_permissions
+permission "pft_general_permissions" do
+  like $permissions.pft_general_permissions
 end
+
+permission "manage_credentials" do
+  like $permissions.manage_credentials
+endd
 
 ##################
 # User inputs    #
