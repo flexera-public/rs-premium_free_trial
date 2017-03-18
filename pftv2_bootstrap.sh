@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# TODO: create schedules, test and publish cats
+# TODO: test and publish cats
 # A help option that'll print a useful usage message
 if [[ "$*" == *"help"* ]]
 then
@@ -131,6 +131,7 @@ management_cat_launch_wait_terminate_delete() {
 if [[ "$options" == *"all"* || "$options" == *"cats"* ]]
 then
   echo "Upserting CAT and library files."
+ 
   for i in `cat $cat_list_file`
   do
     cat_filename=$(echo $i | sed -e "s/CAT_LIST_MODIFIER/$CAT_LIST_MODIFIER/g")
@@ -220,3 +221,52 @@ then
 else
   echo "Skipping Business Hours Schedule."
 fi
+
+# (one day test?) and Publish CATs
+if [[ "$options" == *"all"* || "$options" == *"publish"* ]]
+then
+  echo "Publishing CATs."
+  
+  # get the schedule ID needed for publishing
+  schedule_id=$(rsc --pp -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME --xm ':has(.name:val("Business Hours"))>.id' ss index /designer/collections/$ACCOUNT_ID/schedules | sed 's/"//g')
+  if [[ -z "$schedule_id" ]]
+  then
+    echo "Need Business Hours schedule. Run \"$0 schedule\" "
+    exit 1
+  fi
+        
+  for i in `cat $cat_list_file`
+  do
+    cat_filename=$i
+    # The CATs are identified currently by their existence in the main CATs directory.
+    cat_dir_path=$(dirname "${cat_filename}")
+    if [[ ${cat_dir_path} == "CATs" ]]
+    then
+        cat_name=$(sed -n -e "s/^name[[:space:]]['\"]*\(.*\)['\"]/\1/p" $cat_filename)
+
+        echo "Checking to see if ($cat_name - $cat_filename) has already been uploaded..."
+        cat_href=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss index collections/$ACCOUNT_ID/templates "filter[]=name==$cat_name" | jq -r '.[0].href')
+        if [[ -z "$cat_href" ]]
+        then
+          echo "Need to upload the CATs first. Run \"$0 cats\""
+          exit 1
+        fi
+
+        echo "Checking to see if ($cat_name - $cat_filename) has already been published ..."
+        catalog_href=$(rsc --pp -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss index /api/catalog/catalogs/$ACCOUNT_ID/applications | jq ".[] | select(.name==\"$cat_name\") | .href" | sed 's/"//g')
+
+        if [[ -z "$catalog_href" ]]
+        then
+          echo "($cat_name - $cat_filename) not already published, publishing it now..."
+          # Publish the CAT
+          rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss publish /designer/collections/${ACCOUNT_ID}/templates id="${cat_href}" schedules[]=${schedule_id}
+        else
+          echo "($cat_name - $cat_filename) already published, updating it now..."
+          rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss publish /designer/collections/${ACCOUNT_ID}/templates id="${cat_href}" schedules[]=${schedule_id} overridden_application_href="${catalog_href}"
+        fi
+     fi
+  done
+else
+  echo "Skipping CAT publication."
+fi
+

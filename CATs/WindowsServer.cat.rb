@@ -37,6 +37,15 @@ import "pft/server_templates_utilities"
 import "pft/cloud_utilities"
 import "pft/account_utilities"
 import "pft/err_utilities", as: "debug"
+import "pft/permissions"
+
+ 
+##################
+# Permissions    #
+##################
+permission "pft_permissions" do
+  like $permissions.pft_permissions
+end
 
 ##################
 # User inputs    #
@@ -192,13 +201,6 @@ end
 resource "placement_group", type: "placement_group" do
   condition $needsPlacementGroup
   like @common_resources.placement_group
-end
- 
-##################
-# Permissions    #
-##################
-permission "import_servertemplates" do
-  like $server_templates_utilities.import_servertemplates
 end
 
 ####################

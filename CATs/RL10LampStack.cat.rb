@@ -41,6 +41,14 @@ import "pft/rl10/lamp_resources", as: "lamp_resources"
 import "pft/server_templates_utilities"
 import "pft/server_array_utilities"
 import "pft/rl10/lamp_utilities", as: "lamp_utilities"
+import "pft/permissions"
+ 
+##################
+# Permissions    #
+##################
+permission "pft_permissions" do
+  like $permissions.pft_permissions
+end
 
 ##################
 # User inputs    #

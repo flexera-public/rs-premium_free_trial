@@ -32,7 +32,7 @@
 #     The image for the MCI in the mapping below needs to be uploaded to the environment.
 
 # Required prolog
-name 'C) Docker Container with  WordPress'
+name 'E) Docker Container with  WordPress'
 rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png) 
 
@@ -49,7 +49,14 @@ import "pft/resources"
 import "pft/server_templates_utilities"
 import "pft/err_utilities"
 import "pft/cloud_utilities"
-
+import "pft/permissions"
+ 
+##################
+# Permissions    #
+##################
+permission "pft_permissions" do
+  like $permissions.pft_permissions
+end
 
 ##################
 # User inputs    #

@@ -34,7 +34,14 @@ import "pft/resources", as: "common_resources"
 import "pft/conditions"
 import "pft/cloud_utilities", as: "cloud"
 import "pft/account_utilities", as: "account"
-
+import "pft/permissions"
+ 
+##################
+# Permissions    #
+##################
+permission "pft_permissions" do
+  like $permissions.pft_permissions
+end
 
 ##################
 # User inputs    #

@@ -41,6 +41,14 @@ import "pft/server_array_utilities"
 import "pft/err_utilities"
 import "pft/creds_utilities"
 import "pft/lamp_utilities"
+import "pft/permissions"
+ 
+##################
+# Permissions    #
+##################
+permission "pft_permissions" do
+  like $permissions.pft_permissions
+end
 
 ##################
 # User inputs    #
