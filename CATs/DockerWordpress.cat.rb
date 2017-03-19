@@ -63,6 +63,7 @@ end
 ##################
 parameter "param_location" do
   like $parameters.param_location
+  allowed_values "AWS", "AzureRM", "Google"
 end
 
 parameter "param_costcenter" do 
@@ -96,6 +97,17 @@ mapping "map_st" do {
   }
 } end
 
+mapping "map_config" do {
+  "st" => {
+    "name" => "PFT Base Linux ServerTemplate",
+    "rev" => "0",
+  },
+  "mci" => {
+    "name" => "PFT Base Linux MCI",
+    "rev" => "0",
+  },
+} end
+
 mapping "map_mci" do {
   "VMware" => { # vSphere 
     "mci_name" => "RightImage_Ubuntu_14.04_x64_v14.2_VMware",   
@@ -113,15 +125,17 @@ mapping "map_mci" do {
 
 ### Server Definition ###
 resource "docker_server", type: "server" do
-  name 'Docker Server'
+  name join(["DockerServer-",last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
+  network find(map($map_cloud, $param_location, "network"))
+  subnets find(map($map_cloud, $param_location, "subnet"))
   instance_type map($map_cloud, $param_location, "instance_type")
-  server_template_href find(map($map_st, "docker_server", "name"), revision: map($map_st, "docker_server", "rev"))
-  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
   security_group_hrefs map($map_cloud, $param_location, "sg")  
+  server_template_href find(map($map_st, "docker_server", "name"), revision: map($map_st, "docker_server", "rev"))
+  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
 end
 
 ### Security Group Definitions ###
@@ -130,7 +144,7 @@ end
 resource "sec_group", type: "security_group" do
   condition $needsSecurityGroup
 
-  name join(["DockerServerSecGrp-",@@deployment.href])
+  name join(["DockerSecGrp-",last(split(@@deployment.href,"/"))])
   description "Docker Server deployment security group."
   cloud map( $map_cloud, $param_location, "cloud" )
 end

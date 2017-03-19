@@ -57,7 +57,7 @@ end
 
 parameter "param_location" do
   like $parameters.param_location
-  allowed_values "AWS", "AzureRM", "Google"
+  allowed_values "AWS", "AzureRM"
   default "AWS"
 end
 
@@ -72,6 +72,27 @@ end
 
 parameter "param_instancetype" do
   like $parameters.param_instancetype
+end
+
+parameter "param_username" do 
+  category "User Inputs"
+  label "Windows Username" 
+#  description "Username (will be created)."
+  type "string" 
+  no_echo "false"
+end
+
+parameter "param_password" do 
+  category "User Inputs"
+  label "Windows Password" 
+  description "Minimum at least 8 characters and must contain at least one of each of the following: 
+  Uppercase characters, Lowercase characters, Digits 0-9, Non alphanumeric characters [@#\$%^&+=]." 
+  type "string" 
+  min_length 8
+  max_length 32
+  # This enforces a stricter windows password complexity in that all 4 elements are required as opposed to just 3.
+  allowed_pattern '(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=])'
+  no_echo "true"
 end
 
 parameter "param_costcenter" do 
@@ -90,22 +111,11 @@ output "output_server_ip" do
   default_value @windows_server.public_ip_address
 end
 
-output "output_win_username" do
-  label "Windows User Name"
+output "output_admin_username" do
+  label "Admin Username"
   category "Output"
-  description "Admin user name for the server."
-end
-
-output "output_win_credname" do
-  label "Windows Password Credential Name" 
-  category "Output"
-  description "Name to Credential Storing Windows Password"
-end
-
-output "output_win_cred_uri" do
-  label "Windows Password Credential Link" 
-  category "Output"
-  description "Link to Credential Storing Windows Password"
+  description "Admin Username to access server."
+  default_value $param_username
 end
 
 ##############
@@ -219,20 +229,13 @@ end
 operation "enable" do
   description "Get information once the app has been launched"
   definition "enable"
-  
-  # Update the links provided in the outputs.
-   output_mappings do {
-     $output_win_username => $win_username,
-     $output_win_credname => $credname,
-     $output_win_cred_uri => $cred_uri
-   } end
 end
 
-operation "terminate" do
-  description "clean up before auto terminate"
-  definition "pre_auto_terminate"
-end
-
+operation "update_server_password" do
+  label "Update Server Password"
+  description "Update/reset password."
+  definition "update_password"
+end 
 
 ##########################
 # DEFINITIONS (i.e. RCL) #
@@ -248,39 +251,37 @@ define pre_auto_launch($map_cloud, $param_location, $map_st) do
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
   call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
-
+  
+  # Import the RightScript that is used to setup the username and password later
+  @pub_rightscript = last(rs_cm.publications.index(filter: ["name==SYS Set Admin Account (v14.2)"]))
+  @pub_rightscript.import()
 end
 
-define enable(@windows_server, $param_costcenter, $param_location) return $win_username, $credname, $cred_uri do
+define enable(@windows_server, $param_username, $param_password, $param_costcenter, $param_location) do
   
   # Tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
   rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
-  # Gather up the generated password and make a credential for it and let the user know where to find it.
-  $instance_info = @windows_server.current_instance().get(view: "sensitive")
-  $admin_password = $instance_info[0]["admin_password"]
-  $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",last(split(@@deployment.href,"/"))])
-  @cred = rs_cm.credentials.create({"name":$credname, "value": $admin_password})
-  
-  $cred_num = last(split(@cred.href, "/"))
-  call account_utilities.find_account_number() retrieve $account_num
-  $cred_uri = "https://my.rightscale.com/acct/"+$account_num+"/credentials/"+$cred_num
-  
-  $win_username = "administrator"  
-  if ($param_location == "AzureRM") 
-    $win_username = "rsadministrator" 
-  end
+  # Run the script to set up the username and password
+  $script_name = "SYS Set Admin Account (v14.2)"
+  $script_inputs = {
+    'ADMIN_PASSWORD':join(['text:', $param_password]),
+    'ADMIN_ACCOUNT_NAME':join(['text:', $param_username])   
+  }
+  call server_templates_utilities.run_script_inputs(@windows_server, $script_name, $script_inputs)
 
 end 
 
-# Delete the credential created for the windows password
-define pre_auto_terminate() do
-  
-  # Delete the cred we created for the user-provided password
-  $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",last(split(@@deployment.href,"/"))])
-  @cred=rs_cm.credentials.get(filter: [join(["name==",$credname])])
-  @cred.destroy()
-  
+define update_password(@windows_server, $param_password) do
+  task_label("Update the windows server password.")
+
+  # Run the script to set up the username and password
+  $script_name = "SYS Set Admin Account (v14.2)"
+  $script_inputs = {
+    'ADMIN_PASSWORD':join(['text:', $param_password])
+  }
+  call server_templates_utilities.run_script_inputs(@windows_server, $script_name, $script_inputs)
+
 end
 
