@@ -59,6 +59,7 @@ end
 ##################
 parameter "param_location" do
   like $parameters.param_location
+  allowed_values "AWS", "AzureRM", "Google"
 end
 
 parameter "param_costcenter" do
