@@ -62,7 +62,6 @@ end
 ##################
 parameter "param_location" do
   like $parameters.param_location
-  allowed_values "AWS", "AzureRM", "Google"
 end
 
 parameter "param_costcenter" do 
@@ -141,8 +140,8 @@ resource "sec_group_rule_http", type: "security_group_rule" do
   direction "ingress"
   cidr_ips "0.0.0.0/0"
   protocol_details do {
-    "start_port" => "8080",
-    "end_port" => "8080"
+    "start_port" => "80",
+    "end_port" => "80"
   } end
 end
 
