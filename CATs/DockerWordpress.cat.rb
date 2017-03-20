@@ -91,7 +91,7 @@ end
 
 mapping "map_config" do {
   "st" => {
-    "name" => "PFT Base Linux ServerTemplate",
+    "name" => "PFT Base Docker",
     "rev" => "0",
   },
   "mci" => {
@@ -227,15 +227,19 @@ define pre_auto_launch($map_cloud, $param_location) do
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
   call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
+  
+  # Set things up for docker stuff
+  $inp = {
+    "PACKAGES":"text:ruby",  
+    "DOCKER_ENVIRONMENT" : "text:mysql:\r\n  MYSQL_ROOT_PASSWORD: example\r\nwordpress:\r\n  WORDPRESS_DB_HOST: mysql\r\n  WORDPRESS_DB_USER: root\r\n  WORDPRESS_DB_PASSWORD: example",
+    "DOCKER_SERVICES" : "text:wordpress:\r\n  image: wordpress\r\n  restart: always\r\n  depends_on:\r\n    - mysql\r\n  ports:\r\n    - \"80:80\"\r\nmysql:\r\n  image: mariadb"
+  } 
+  @@deployment.multi_update_inputs(inputs: $inp)
 
 end
     
 define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $wordpress_link do  
     
-  # import and run all the RightScripts that make this base Linux server into a Docker host.
-  call make_it_a_docker_host(@docker_server)
-  
-  # run the compose script and then bring up the project
   call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services compose")
   call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services up")
   
@@ -263,12 +267,12 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $w
 end
 
 # Imports and runs all the scripts that are needed to make it a docker host
-define make_it_a_docker_host(@docker_server) do
-  $docker_rightscripts = [ "SYS Packages Install", "SYS Swap Setup", "SYS Swap Setup", "SYS docker-compose install latest", "SYS docker engine install latest", "SYS docker TCP enable", "RL10 Linux Enable Docker Support (Beta)", "APP docker services compose", "APP docker services up" ]
-  foreach $docker_rs in $docker_rightscripts do
-    @pub_rightscript = last(rs_cm.publications.index(filter: ["name==SYS Set Admin Account (v14.2)"]))
-    @pub_rightscript.import()
-    call server_templates_utilities.run_script_no_inputs(@docker_server, $docker_rs)
-  end
-end
+#define make_it_a_docker_host(@docker_server) do
+#  $docker_rightscripts = [ "SYS Packages Install", "SYS Swap Setup", "SYS Swap Setup", "SYS docker-compose install latest", "SYS docker engine install latest", "SYS docker TCP enable", "RL10 Linux Enable Docker Support (Beta)", "APP docker services compose", "APP docker services up" ]
+#  foreach $docker_rs in $docker_rightscripts do
+#    @pub_rightscript = last(rs_cm.publications.index(filter: ["name=="+$docker_rs]))
+#    @pub_rightscript.import()
+#    call server_templates_utilities.run_script_no_inputs(@docker_server, $docker_rs)
+#  end
+#end
 

@@ -26,6 +26,7 @@ Account_Management/network_management.cat.rb
 Account_Management/mci_management_base_linux.cat.rb
 Account_Management/mci_management_base_windows.cat.rb
 Account_Management/st_management_base_linux.cat.rb
+Account_Management/st_management_base_docker.cat.rb
 Account_Management/st_management_base_windows.cat.rb
 Account_Management/st_management_lamp.cat.rb
 CATs/LinuxServer.cat.rb
