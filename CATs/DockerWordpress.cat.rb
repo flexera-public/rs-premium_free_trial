@@ -37,8 +37,7 @@ short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
 
 Launch a Docker container with WordPress"
 long_description "Launch a Docker server and run WordPress and Database containers.\n
-\n
-Clouds Supported: <B>AWS, Azure, Google, VMware</B>"
+\n"
 
 import "pft/parameters"
 import "pft/outputs"
@@ -62,6 +61,7 @@ end
 ##################
 parameter "param_location" do
   like $parameters.param_location
+  allowed_values "AWS", "AzureRM", "Google" 
 end
 
 parameter "param_costcenter" do 
