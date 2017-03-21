@@ -27,6 +27,9 @@ RightScripts:
     Publisher: RightScale
     Revision: 4
   - Kubernetes_Setup.sh
+  - Name: RL10 Linux Enable Docker Support (Beta)
+    Publisher: RightScale
+    Revision: 3
   Decommission:
   - Name: RL10 Linux Shutdown Reason
     Publisher: RightScale
@@ -38,9 +41,6 @@ RightScripts:
   - Name: RL10 Linux Upgrade
     Publisher: RightScale
     Revision: 8
-  - Name: RL10 Linux Enable Docker Support (Beta)
-    Publisher: RightScale
-    Revision: 3
   - Kubernetes_Install_Hello.sh
 MultiCloudImages:
 - Name: Ubuntu_16.04_x64
