@@ -10,7 +10,7 @@ then
   echo "    cats - Upserts all libraries and application cats"
   echo "    sts - Upserts all ServerTemplates"
   echo "    management - Launches management CATs for creating networks, MCI, and STs"
-  echo "    creds - Upserts the PFT_RS_REFRESH_TOKEN credential with the value provided in OAUTH_REFRESH_TOKEN"
+#  echo "    creds - Upserts the PFT_RS_REFRESH_TOKEN credential with the value provided in OAUTH_REFRESH_TOKEN"
   echo "    schedule - Creates a 'Business Hours' CAT schedule"
   echo "    publish - Publishes the CATs to the Self-Service catalog with the \"Business Hours\" (and \"Always On\") schedules."
 fi
@@ -66,6 +66,23 @@ if [[ $? != 0 ]]
 then
   echo "The binary 'right_st' must be installed - https://github.com/rightscale/right_st"
   exit 1
+fi
+
+# There are various predefined CREDENTIALs the PFT CATs use.
+# Check for them and tell the user to set them if not already set.
+for cred_name in "PFT_RS_REFRESH_TOKEN"
+do
+  credential=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index credentials "filter[]=name==${cred_name}")
+  if [[ -z "$credential" ]]
+  then
+    echo "### REQUIRED ### The account is missing the \"${cred_name}\" credential. Please set it before continuing."
+    missing_cred="true"
+  fi
+done
+
+if [[ "$missing_cred" == "true" ]]
+then
+    exit 1
 fi
 
 # Finally, if STS import is specified, and the Chef Server isn't already imported
@@ -186,6 +203,7 @@ else
   echo "Skipping ServerTemplates."
 fi
 
+# DEPRECATED.
 # Set PFT_RS_REFRESH_TOKEN step
 if [[ "$options" == *"all"* || "$options" == *"creds"* ]]
 then
