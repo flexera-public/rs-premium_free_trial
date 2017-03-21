@@ -53,7 +53,7 @@ end
 
 ### Placement group declaration ###
 resource "placement_group", type: "placement_group" do
-  name last(split(@@deployment.href,"/"))
+  name join(["rspft",last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
 end 
 
