@@ -1,0 +1,58 @@
+#! /usr/bin/sudo /bin/bash
+# ---
+# RightScript Name: PFT DB Config
+# Description: Moves the db config file created by the chef app config to the correct location for the PFT example app
+# Inputs:
+#   APPLICATION_NAME:
+#     Category: Application
+#     Description: 'The name of the application. This name is used to generate the path
+#       of the application code and to determine the backend pool in a load balancer
+#       server that the application server will be attached to. Application names can
+#       have only alphanumeric characters and underscores. Example: hello_world'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_HOST:
+#     Category: Application
+#     Description: 'The FQDN of the database server. Example: db.example.com'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_SCHEMA:
+#     Category: Application
+#     Description: 'The password used to connect to the database. Example: cred:MYSQL_APPLICATION_PASSWORD'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_USER:
+#     Category: Application
+#     Description: 'The username used to connect to the database. Example: cred:MYSQL_APPLICATION_USERNAME'
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+#   DATABASE_PASSWORD:
+#     Category: Application
+#     Input Type: single
+#     Required: true
+#     Advanced: false
+# Attachments: []
+# ...
+
+release_file=/usr/local/www/sites/$APPLICATION_NAME/current/config/db.php
+shared_file=/usr/local/www/sites/$APPLICATION_NAME/shared/db.php
+
+if [[ -f $release_file ]]
+then
+  rm $release_file
+fi
+
+cat <<EOF > $shared_file
+<?php
+//DataBase Connect Infomation
+\$hostname_DB = "$DATABASE_HOST";
+\$database_DB = "$DATABASE_SCHEMA";
+\$username_DB = "$DATABASE_USER";
+\$password_DB = "$DATABASE_PASSWORD";
+?>
+EOF
+ln -sf $shared_file $release_file

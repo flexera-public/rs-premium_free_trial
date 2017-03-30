@@ -10,7 +10,7 @@ condition "needsSshKey" do
 end
 
 condition "needsSecurityGroup" do
-  logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google"))
+  logic_or(logic_or(equals?($param_location, "AWS"), equals?($param_location, "Google")), equals?($param_location, "AzureRM"))
 end
 
 condition "needsPlacementGroup" do
@@ -23,6 +23,10 @@ end
 
 condition "inAzure" do
   equals?($param_location, "Azure")
+end
+
+condition "inAzureRM" do
+  equals?($param_location, "AzureRM")
 end
 
 ## needed for compilation

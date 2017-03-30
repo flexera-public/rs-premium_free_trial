@@ -16,8 +16,9 @@
 #RightScale Cloud Application Template (CAT)
 
 # DESCRIPTION
-# A quick prototype that layers Docker on a running server launching using the base linux servertemplate.
-# It then installs a WordPress container.
+# Deploys a Docker server and automatically installs WordPress.
+# It automatically imports the ServerTemplate it needs.
+# Also, if needed by the target cloud, the security group and/or ssh key is automatically created by the CAT.
 #
 # TO-DOs:
 #   The ServerTemplate being used supports a docker-compose input. The default is a docker-compose for WordPress.
@@ -31,13 +32,14 @@
 #     The image for the MCI in the mapping below needs to be uploaded to the environment.
 
 # Required prolog
-name 'E) Docker Container with  WordPress'
+name 'C) Docker Container with  WordPress'
 rs_ca_ver 20160622
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png) 
 
 Launch a Docker container with WordPress"
 long_description "Launch a Docker server and run WordPress and Database containers.\n
-\n"
+\n
+Clouds Supported: <B>AWS, Azure, Google, VMware</B>"
 
 import "pft/parameters"
 import "pft/outputs"
@@ -52,8 +54,8 @@ import "pft/permissions"
 ##################
 # Permissions    #
 ##################
-permission "pft_general_permissions" do
-  like $permissions.pft_general_permissions
+permission "pft_permissions" do
+  like $permissions.pft_permissions
 end
 
 ##################
@@ -61,7 +63,6 @@ end
 ##################
 parameter "param_location" do
   like $parameters.param_location
-  allowed_values "AWS", "AzureRM", "Google" 
 end
 
 parameter "param_costcenter" do 
@@ -88,15 +89,22 @@ mapping "map_cloud" do
   like $mappings.map_cloud
 end
 
-mapping "map_config" do {
-  "st" => {
-    "name" => "PFT Base Docker",
-    "rev" => "0",
+mapping "map_st" do {
+  "docker_server" => {
+    "name" => "Docker Technology Demo",
+    "rev" => "2",
+  }
+} end
+
+mapping "map_mci" do {
+  "VMware" => { # vSphere 
+    "mci_name" => "RightImage_Ubuntu_14.04_x64_v14.2_VMware",   
+    "mci_rev" => "7",
   },
-  "mci" => {
-    "name" => "PFT Base Linux MCI",
-    "rev" => "0",
-  },
+  "Public" => { # all other clouds
+    "mci_name" => "RightImage_Ubuntu_14.04_x64_v14.2",
+    "mci_rev" => "11",
+  }
 } end
 
 ############################
@@ -105,17 +113,15 @@ mapping "map_config" do {
 
 ### Server Definition ###
 resource "docker_server", type: "server" do
-  name join(["DockerServer-",last(split(@@deployment.href,"/"))])
+  name 'Docker Server'
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
-  network find(map($map_cloud, $param_location, "network"))
-  subnets find(map($map_cloud, $param_location, "subnet"))
   instance_type map($map_cloud, $param_location, "instance_type")
+  server_template_href find(map($map_st, "docker_server", "name"), revision: map($map_st, "docker_server", "rev"))
+  multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
   security_group_hrefs map($map_cloud, $param_location, "sg")  
-  server_template_href find(map($map_config, "st", "name"), revision: map($map_config, "st", "rev"))
-  multi_cloud_image_href find(map($map_config, "mci", "name"), revision: map($map_config, "mci", "rev"))
 end
 
 ### Security Group Definitions ###
@@ -124,7 +130,7 @@ end
 resource "sec_group", type: "security_group" do
   condition $needsSecurityGroup
 
-  name join(["DockerSecGrp-",last(split(@@deployment.href,"/"))])
+  name join(["DockerServerSecGrp-",@@deployment.href])
   description "Docker Server deployment security group."
   cloud map( $map_cloud, $param_location, "cloud" )
 end
@@ -140,8 +146,8 @@ resource "sec_group_rule_http", type: "security_group_rule" do
   direction "ingress"
   cidr_ips "0.0.0.0/0"
   protocol_details do {
-    "start_port" => "80",
-    "end_port" => "80"
+    "start_port" => "8080",
+    "end_port" => "8080"
   } end
 end
 
@@ -169,6 +175,13 @@ resource "placement_group", type: "placement_group" do
   condition $needsPlacementGroup
   like @resources.placement_group
 end 
+
+##################
+# Permissions    #
+##################
+permission "import_servertemplates" do
+  like $server_templates_utilities.import_servertemplates
+end
 
 ##################
 # CONDITIONS     #
@@ -218,7 +231,7 @@ end
 
 # Import and set up what is needed for the server and then launch it.
 # The server template includes a docker compose input which automatically installs Wordpress
-define pre_auto_launch($map_cloud, $param_location) do
+define pre_auto_launch($map_cloud, $param_location, $map_st) do
   
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
 
@@ -226,22 +239,14 @@ define pre_auto_launch($map_cloud, $param_location) do
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
   call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
-  
-  # Set things up for docker stuff
-  $inp = {
-    "PACKAGES":"text:ruby",  
-    "DOCKER_ENVIRONMENT" : "text:mysql:\r\n  MYSQL_ROOT_PASSWORD: example\r\nwordpress:\r\n  WORDPRESS_DB_HOST: mysql\r\n  WORDPRESS_DB_USER: root\r\n  WORDPRESS_DB_PASSWORD: example",
-    "DOCKER_SERVICES" : "text:wordpress:\r\n  image: wordpress\r\n  restart: always\r\n  depends_on:\r\n    - mysql\r\n  ports:\r\n    - \"80:80\"\r\nmysql:\r\n  image: mariadb"
-  } 
-  @@deployment.multi_update_inputs(inputs: $inp)
+    
+  # Find and import the server template - just in case it hasn't been imported to the account already
+  call server_templates_utilities.importServerTemplate($map_st)
 
 end
     
 define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $wordpress_link do  
     
-  call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services compose")
-  call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services up")
-  
   # Tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
   rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
@@ -260,18 +265,28 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $w
     end
     $wordpress_server_address = @docker_server.current_instance().public_ip_addresses[0]
   end
-    
-  $wordpress_link = join(["http://",$wordpress_server_address])
+  
+  $wordpress_port = "8080"
+
+  if $inAzure
+    # Find the current bindings for the namenode instance and then drill down to find the IP address href
+    @bindings = rs_cm.clouds.get(href: @docker_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @docker_server.current_instance().href])
+    @binding = select(@bindings, {"private_port":22})
+    @ipaddr = @binding.ip_address()
+     
+     # Create the binding. We are going to use the chosen port - since we can.
+     @docker_server.current_instance().cloud().ip_address_bindings().create({"instance_href" : @docker_server.current_instance().href, 
+       "public_ip_address_href" : @ipaddr.href, 
+       "protocol" : "TCP", 
+       "private_port" : $wordpress_port, 
+       "public_port" : $wordpress_port})     
+  end
+  
+  $wordpress_link = join(["http://",$wordpress_server_address,":", $wordpress_port])
+  
+  # For some reason in Azure, the docker containers - esp wordpress - don't get started as expected.
+  # Although this has only been seen in Azure we'll force a start in all clouds - just to be safe.
+  call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services up")
 
 end
-
-# Imports and runs all the scripts that are needed to make it a docker host
-#define make_it_a_docker_host(@docker_server) do
-#  $docker_rightscripts = [ "SYS Packages Install", "SYS Swap Setup", "SYS Swap Setup", "SYS docker-compose install latest", "SYS docker engine install latest", "SYS docker TCP enable", "RL10 Linux Enable Docker Support (Beta)", "APP docker services compose", "APP docker services up" ]
-#  foreach $docker_rs in $docker_rightscripts do
-#    @pub_rightscript = last(rs_cm.publications.index(filter: ["name=="+$docker_rs]))
-#    @pub_rightscript.import()
-#    call server_templates_utilities.run_script_no_inputs(@docker_server, $docker_rs)
-#  end
-#end
 

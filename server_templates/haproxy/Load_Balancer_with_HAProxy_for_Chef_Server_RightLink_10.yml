@@ -1,0 +1,99 @@
+Name: PFT Load Balancer with HAProxy for Chef Server (RightLink 10)
+Description: "Load Balancer with HAProxy for Chef Server ServerTemplate.   RightLink10
+  is a new agent to connect servers to the RightScale platform that is very lightweight
+  and simple to install.\n_It is not a plug-in upgrade from the older RightLink v6
+  series._\nSee [http://docs.rightscale.com/rl/about.html](http://docs.rightscale.com/rl/about.html)
+  for details.\n\nIn addition to installing HAProxy, this ServerTemplate runs a script
+  to update the packaging system and enable automatic security updates, and a collectd
+  install script to enable RightScale monitoring. \n\nThe ServerTemplate can run on
+  most any Linux distro that supports cloud-init. It is recommended to use the standard
+  distro images in various clouds.\n\n__ Requirements__\n\n * Chef Server or Hosted
+  Chef\n * [rs-haproxy](https://github.com/rightscale-cookbooks/rs-haproxy) ([1.2.0](https://github.com/rightscale-cookbooks/rs-haproxy/releases/tag/v1.2.0))\n\n__Key
+  Features:__\n\n * Downloads source code, builds, and installs HAProxy and configures
+  the server to act as the front-end for all HTTP(S) requests.\n * Recipe to attach
+  existing application servers in the deployment.\n * Recipe to set up load balancer
+  machine tags on the server.\n * Monitoring HAProxy process.\n * Basic set of recipes
+  for a RightLink-based server with logging, monitoring, alerts, tagging, etc.\n *
+  MultiCloud Images that reference the latest supported images with a frozen and tested
+  software repository date.\n * Basic set of alerts for most server type monitoring.\n
+  * Examples of system-required input variables.\n\n__Documentation:__  \n\n* [Overview](http://docs.rightscale.com/st/rl10/lb/overview.html)
+  \ \n* [Tutorial](http://docs.rightscale.com/st/rl10/lb/tutorial.html)  \n\n* * *\n\n__Tested
+  Linux distros:__\n\n* Ubuntu 14.04 x86_64\n\n\n__Tested compute clouds:__\n\n* AWS"
+Inputs:
+  COLLECTD_SERVER: env:RS_TSS
+  RS_INSTANCE_UUID: env:RS_INSTANCE_UUID
+  VERSION: text:11.6
+RightScripts:
+  Boot:
+  - RL10_Linux_Wait_For_EIP.sh
+  - RL10_Linux_Setup_Hostname.sh
+  - RL10_Linux_Enable_Managed_Login.sh
+  - RL10_Linux_Enable_Monitoring.sh
+  - RL10_Linux_Setup_Alerts.sh
+  - RL10_Linux_Setup_Automatic_Upgrade.sh
+  - Chef_Client_Install.sh
+  - HAProxy_Install-chef.sh
+  - HAProxy_Frontend-chef.sh
+  - HAProxy_Schedule-chef.sh
+  Decommission:
+  - RL10_Linux_Shutdown_Reason.sh
+  - Chef_Client_Delete_Node.sh
+  Operational:
+  - HAProxy_Frontend-chef.sh
+  - HAProxy_Schedule-chef.sh
+  - RL10_Linux_Setup_Automatic_Upgrade.sh
+  - RL10_Linux_Upgrade.sh
+MultiCloudImages:
+- Name: PFT Base Linux MCI
+Alerts:
+- Name: rs instance terminated
+  Description: Raise an alert if the instance has been terminated abnormally, i.e.
+    not through the RightScale interface or by an elasticity daemon resizing server
+    arrays.
+  Clause: If RS/server.state == terminated for 1 minutes Then escalate critical
+- Name: rs instance stranded
+  Description: Raise an alert if the instance enters the stranded state.
+  Clause: If RS/server-failure.state == stranded for 1 minutes Then escalate warning
+- Name: rs instance not responding
+  Description: Raise an alert if the instance fails to send monitoring information
+    for 5 minutes.
+  Clause: If cpu-0/cpu-idle.value == NaN for 5 minutes Then escalate critical
+- Name: rs cpu busy
+  Description: Raise an alert if the idle time is too low.
+  Clause: If cpu-0/cpu-idle.value < 15 for 3 minutes Then escalate warning
+- Name: rs cpu overloaded
+  Description: Raise an alert when the cpu idle time is too low.
+  Clause: If cpu-0/cpu-idle.value < 3 for 5 minutes Then escalate critical
+- Name: rs cpu I/O wait
+  Description: Raise an alert if disk io is too high.
+  Clause: If cpu-0/cpu-wait.value > 40 for 15 minutes Then escalate warning
+- Name: rs low space in root partition
+  Description: Raise an alert if the available space in the root partition is too
+    low. This alert may be modified on an instance to match the metric name df/df-root.free
+    instead if the instance is running collectd 4. See the RL10 Linux Setup Alerts
+    RightScript (rll/setup-alerts.sh) for more details.
+  Clause: If df-root/df_complex-free.value < 1073741824 for 5 minutes Then escalate
+    critical
+- Name: rs high network tx activity
+  Description: Raise an alert if the amount of network data transmitted is too high.
+    This alert may be modified or cloned on an instance to match the actual network
+    interfaces that are present. See the RL10 Linux Setup Alerts RightScript (rll/setup-alerts.sh)
+    for more details.
+  Clause: If interface-eth0/if_octets.tx > 10000000 for 10 minutes Then escalate critical
+- Name: rs high network rx activity
+  Description: Raise an alert if the amount of network data received is too high.
+    This alert may be modified or cloned on an instance to match the actual network
+    interfaces that are present. See the RL10 Linux Setup Alerts RightScript (rll/setup-alerts.sh)
+    for more details.
+  Clause: If interface-eth0/if_octets.rx > 50000000 for 30 minutes Then escalate critical
+- Name: rs low swap space
+  Description: Raise alert if the free swap space is too low. This alert may be removed
+    from an instance if swap is not enabled. See the RL10 Linux Setup Alerts RightScript
+    (rll/setup-alerts.sh) for more details.
+  Clause: If swap/swap-free.value < 104857600 for 5 minutes Then escalate critical
+- Name: rs memory low
+  Description: Raise an alert if free memory is too low.
+  Clause: If memory/memory-free.value < 1000000 for 1 minutes Then escalate critical
+- Name: rs out of memory
+  Description: Raise an alert when the server is out of free memory.
+  Clause: If memory/memory-free.value == 0 for 1 minutes Then escalate critical

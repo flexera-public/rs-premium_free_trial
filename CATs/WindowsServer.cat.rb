@@ -1,5 +1,5 @@
 #Copyright 2015 RightScale
-#x
+#
 #Licensed under the Apache License, Version 2.0 (the "License");
 #you may not use this file except in compliance with the License.
 #You may obtain a copy of the License at
@@ -18,18 +18,16 @@
 # DESCRIPTION
 # Deploys a Windows Server of the type chosen by the user.
 # It automatically imports the ServerTemplate it needs.
-# Also, if needed by the target cloud, the security group and/or ssh key is automatically created by the CAT.
-
 
 # Required prolog
 name 'B) Corporate Standard Windows Server'
-rs_ca_ver 20160622
+rs_ca_ver 20161221
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/windows.png) 
 
-Get a Windows Server VM in any of our supported public or private clouds"
+Get a Windows Server VM in a our supported public clouds."
 long_description "Allows you to select different windows server types and cloud and performance level you want.\n
 \n
-Clouds Supported: <B>AWS, Azure</B>"
+Clouds Supported: <B>AWS, AzureRM, Google</B>"
 
 import "pft/parameters"
 import "pft/mappings"
@@ -38,6 +36,20 @@ import "pft/conditions"
 import "pft/server_templates_utilities"
 import "pft/cloud_utilities"
 import "pft/account_utilities"
+import "pft/err_utilities", as: "debug"
+import "pft/permissions"
+
+ 
+##################
+# Permissions    #
+##################
+permission "pft_general_permissions" do
+  like $permissions.pft_general_permissions
+end
+
+permission "pft_sensitive_views" do
+  like $permissions.pft_sensitive_views
+end
 
 ##################
 # User inputs    #
@@ -45,7 +57,7 @@ import "pft/account_utilities"
 
 parameter "param_location" do
   like $parameters.param_location
-  allowed_values "AWS", "Azure"
+  allowed_values "AWS", "AzureRM"
   default "AWS"
 end
 
@@ -53,14 +65,9 @@ parameter "param_servertype" do
   category "Deployment Options"
   label "Windows Server Type"
   type "list"
-  allowed_values "Windows 2008R2 Base Server",
-  "Windows 2008R2 IIS Server",
-  "Windows 2008R2 Server with SQL 2008",
-  "Windows 2008R2 Server with SQL 2012",
-  "Windows 2012 Base Server",
-  "Windows 2012 IIS Server",
-  "Windows 2012 Server with SQL 2012"
-  default "Windows 2008R2 Base Server"
+  allowed_values "Windows 2008R2",
+    "Windows 2012R2"
+  default "Windows 2012R2"
 end
 
 parameter "param_instancetype" do
@@ -97,10 +104,18 @@ end
 ################################
 # Outputs returned to the user #
 ################################
-output "rdp_link" do
-  label "RDP Link"
+output "output_server_ip" do
+  label "Server IP"
   category "Output"
-  description "RDP Link to the Windows server."
+  description "IP address for the server."
+  default_value @windows_server.public_ip_address
+end
+
+output "output_admin_username" do
+  label "Admin Username"
+  category "Output"
+  description "Admin Username to access server."
+  default_value $param_username
 end
 
 ##############
@@ -116,40 +131,19 @@ end
 
 mapping "map_st" do {
   "windows_server" => {
-    "name" => "Base ServerTemplate for Windows (v13.5.0-LTS)",
-    "rev" => "3",
+    "name" => "PFT Base Windows ServerTemplate",
+    "rev" => "latest",
   },
 } end
-    
+
+# The off-the-shelf ServerTemplate being used has a couple of different MCIs defined based on the cloud.   
 mapping "map_mci" do {
-  "Windows 2008R2 Base Server" => {
-    "mci" => "RightImage_Windows_2008R2_SP1_x64_v13.5.0-LTS",
-    "mci_rev" => "2"
+  "Windows 2008R2" => {  # Same MCI for all 3 environments
+    "mci" => "PFT Windows_Server_2008R2_x64",
   },
-  "Windows 2008R2 IIS Server" => {
-    "mci" => "RightImage_Windows_2008R2_SP1_x64_iis7.5_v13.5.0-LTS",
-    "mci_rev" => "2"
-  },
-  "Windows 2008R2 Server with SQL 2012" => {
-    "mci" => "RightImage_Windows_2008R2_SP1_x64_sqlsvr2012_v13.5.0-LTS",
-    "mci_rev" => "2"
-  },
-  "Windows 2008R2 Server with SQL 2008" => {
-    "mci" => "RightImage_Windows_2008R2_SP1_x64_sqlsvr2k8r2_v13.5.0-LTS",
-    "mci_rev" => "2"
-  },
-  "Windows 2012 IIS Server" => {
-    "mci" => "RightImage_Windows_2012_x64_iis8_v13.5.0-LTS",
-    "mci_rev" => "2"
-  },
-  "Windows 2012 Server with SQL 2012" => {
-    "mci" => "RightImage_Windows_2012_x64_sqlsvr2012_v13.5.0-LTS",
-    "mci_rev" => "2"
-  },
-  "Windows 2012 Base Server" => {
-    "mci" => "RightImage_Windows_2012_x64_v13.5.0-LTS",
-    "mci_rev" => "2"
-  },
+  "Windows 2012R2" => { # Different MCI for AWS vs ARM and not supported for Google so substituting an R2 version
+    "mci" => "PFT Windows_Server_2012R2_x64",
+  }
 } end
 
 ##################
@@ -176,6 +170,7 @@ end
 condition "inAzure" do
   like $conditions.inAzure
 end 
+  
 
 ############################
 # RESOURCE DEFINITIONS     #
@@ -183,22 +178,19 @@ end
 
 ### Server Definition ###
 resource "windows_server", type: "server" do
-  name 'Windows Server'
+  name join(['win',last(split(@@deployment.href,"/"))])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
-  server_template_href find(map($map_st, "windows_server", "name"), revision: map($map_st, "windows_server", "rev"))
-  multi_cloud_image find(map($map_mci, $param_servertype, "mci"))
+  network find(map($map_cloud, $param_location, "network"))
+  subnets find(map($map_cloud, $param_location, "subnet"))
+  server_template_href find(map($map_st, "windows_server", "name"))
+  multi_cloud_image_href find(map($map_mci, $param_servertype, "mci"))
   instance_type map($map_instancetype, $param_instancetype, $param_location)
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   security_group_hrefs map($map_cloud, $param_location, "sg")  
   placement_group_href map($map_cloud, $param_location, "pg")
-  inputs do {
-    "ADMIN_ACCOUNT_NAME" => join(["text:",$param_username]),
-    "ADMIN_PASSWORD" => join(["cred:CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href]), # this credential gets created below using the user-provided password.
-    "FIREWALL_OPEN_PORTS_TCP" => "text:3389",
-    "SYS_WINDOWS_TZINFO" => "text:Pacific Standard Time",  
-  } end
 end
+  
 
 ### Security Group Definitions ###
 # Note: Even though not all environments need or use security groups, the launch operation/definition will decide whether or not
@@ -224,13 +216,6 @@ resource "placement_group", type: "placement_group" do
   condition $needsPlacementGroup
   like @common_resources.placement_group
 end
- 
-##################
-# Permissions    #
-##################
-permission "import_servertemplates" do
-  like $server_templates_utilities.import_servertemplates
-end
 
 ####################
 # OPERATIONS       #
@@ -244,32 +229,21 @@ end
 operation "enable" do
   description "Get information once the app has been launched"
   definition "enable"
-  
-  # Update the links provided in the outputs.
-   output_mappings do {
-     $rdp_link => $server_ip_address,
-   } end
-end
-
-operation "terminate" do
-  description "clean up before auto terminate"
-  definition "pre_auto_terminate"
 end
 
 operation "update_server_password" do
   label "Update Server Password"
   description "Update/reset password."
   definition "update_password"
-end
-
+end 
 
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
 
 # Import and set up what is needed for the server and then launch it.
-define pre_auto_launch($map_cloud, $param_location, $param_password, $map_st) do
-  
+define pre_auto_launch($map_cloud, $param_location, $map_st) do
+    
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
 
@@ -278,57 +252,36 @@ define pre_auto_launch($map_cloud, $param_location, $param_password, $map_st) do
   # It raises an error if not which stops execution at that point.
   call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
   
-  # Find and import the server template - just in case it hasn't been imported to the account already
-  call server_templates_utilities.importServerTemplate($map_st)
-    
-  # Create the Admin Password credential used for the server based on the user-entered password.
-  $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
-  rs_cm.credentials.create({"name":$credname, "value": $param_password})
-
+  # Import the RightScript that is used to setup the username and password later
+  @pub_rightscript = last(rs_cm.publications.index(filter: ["name==SYS Set Admin Account (v14.2)"]))
+  @pub_rightscript.import()
 end
 
-define enable(@windows_server, $param_costcenter, $inAzure) return $server_ip_address do
+define enable(@windows_server, $param_username, $param_password, $param_costcenter, $param_location) do
   
   # Tag the servers with the selected project cost center ID.
   $tags=[join(["costcenter:id=",$param_costcenter])]
   rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
-  # If deployed in Azure one needs to provide the port mapping that Azure uses.
-  if $inAzure
-     @bindings = rs_cm.clouds.get(href: @windows_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @windows_server.current_instance().href])
-     @binding = select(@bindings, {"private_port":3389})
-     $server_ip_address = join([to_s(@windows_server.current_instance().public_ip_addresses[0]),":",@binding.public_port])
-  else
-    # If not in Azure, then we can actually provide the SSH link like that found in CM.
-    call account_utilities.find_shard() retrieve $shard_number
-    call account_utilities.find_account_number() retrieve $account_number
-    call account_utilities.get_server_access_link(@windows_server, "RDP", $shard_number, $account_number) retrieve $server_ip_address
-  end
+  # Run the script to set up the username and password
+  $script_name = "SYS Set Admin Account (v14.2)"
+  $script_inputs = {
+    'ADMIN_PASSWORD':join(['text:', $param_password]),
+    'ADMIN_ACCOUNT_NAME':join(['text:', $param_username])   
+  }
+  call server_templates_utilities.run_script_inputs(@windows_server, $script_name, $script_inputs)
+
 end 
 
-# post launch action to change the credentials
 define update_password(@windows_server, $param_password) do
   task_label("Update the windows server password.")
 
-  if $param_password
-    $cred_name = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
-    # update the credential
-    rs_cm.audit_entries.create(audit_entry: {auditee_href: @@deployment.href, summary: join(["Updating credential, ", $cred_name])})
-    @cred = rs_cm.credentials.get(filter: [ join(["name==",$cred_name]) ])
-    @cred.update(credential: {"value" : $param_password})
-  end
-  
-  # Now run the set admin script which will use the newly updated credential.
-  call server_templates_utilities.run_script_no_inputs(@windows_server, "SYS Set admin account (v13.5.0-LTS)")
-end
+  # Run the script to set up the username and password
+  $script_name = "SYS Set Admin Account (v14.2)"
+  $script_inputs = {
+    'ADMIN_PASSWORD':join(['text:', $param_password])
+  }
+  call server_templates_utilities.run_script_inputs(@windows_server, $script_name, $script_inputs)
 
-# Delete the credential created for the windows password
-define pre_auto_terminate() do
-  
-  # Delete the cred we created for the user-provided password
-  $credname = join(["CAT_WINDOWS_ADMIN_PASSWORD-",@@deployment.href])
-  @cred=rs_cm.credentials.get(filter: [join(["name==",$credname])])
-  @cred.destroy()
-  
 end
 

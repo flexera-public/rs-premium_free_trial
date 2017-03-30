@@ -26,7 +26,7 @@
 # Store the API keys in CREDENIALs and use cred: in inputs instead of current clear text approach.
 # Support more clouds. This would require coordinating with the ST author to add images in other clouds.
 
-name 'Rancher Cluster'
+name 'F) Rancher Cluster'
 rs_ca_ver 20161221
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/rancher_logo.png) ![logo](https://s3.amazonaws.com/rs-pft/cat-logos/docker.png)
 
