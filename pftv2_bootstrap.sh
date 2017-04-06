@@ -10,6 +10,7 @@ then
   echo "    cats - Upserts all libraries and application cats"
   echo "    sts - Upserts all ServerTemplates"
   echo "    management - Launches management CATs for creating networks, MCI, and STs"
+  echo "        use management_no_network to skip setting up the ARM networks. Useful when just updating MCIs and STs."
 #  echo "    creds - Upserts the PFT_RS_REFRESH_TOKEN credential with the value provided in OAUTH_REFRESH_TOKEN"
   echo "    schedule - Creates a 'Business Hours' CAT schedule"
   echo "    publish - Publishes the CATs to the Self-Service catalog with the \"Business Hours\" (and \"Always On\") schedules."
@@ -178,6 +179,9 @@ then
   if [[ -z "$azure_clouds" ]]
   then
     echo "No AzureV2 clouds, the network management CAT will not be executed"
+  elif [[ "$options" == *"management_no_network"* ]]
+  then
+    echo "Skipping network setup"
   else
     management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Network Setup"
   fi
