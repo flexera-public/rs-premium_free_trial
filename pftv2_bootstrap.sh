@@ -10,7 +10,8 @@ then
   echo "    cats - Upserts all libraries and application cats"
   echo "    sts - Upserts all ServerTemplates"
   echo "    management - Launches management CATs for creating networks, MCI, and STs"
-  echo "        use management_no_network to skip setting up the ARM networks. Useful when just updating MCIs and STs."
+  echo "        use management_no_network to skip setting up the ARM networks."
+  echo "        use management_mcis_only to only run the MCI update scripts. Useful when just updating MCIs."
 #  echo "    creds - Upserts the PFT_RS_REFRESH_TOKEN credential with the value provided in OAUTH_REFRESH_TOKEN"
   echo "    schedule - Creates a 'Business Hours' CAT schedule"
   echo "    publish - Publishes the CATs to the Self-Service catalog with the \"Business Hours\" (and \"Always On\") schedules."
@@ -174,23 +175,30 @@ fi
 if [[ "$options" == *"all"* || "$options" == *"management"* ]]
 then
   echo "Launching management CATs."
-
-  azure_clouds=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index clouds "filter[]=cloud_type==azure_v2")
-  if [[ -z "$azure_clouds" ]]
-  then
-    echo "No AzureV2 clouds, the network management CAT will not be executed"
-  elif [[ "$options" == *"management_no_network"* ]]
-  then
-    echo "Skipping network setup"
-  else
-    management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Network Setup"
-  fi
+  
+  # Do MCI work regardless
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux MCI Setup/Maintenance"
-  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux ServerTemplate Setup/Maintenance"
-  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Docker ServerTemplate Setup/Maintenance"
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Windows MCI Setup/Maintenance"
-  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Windows ServerTemplate Setup/Maintenance"
-  management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT LAMP ServerTemplates Prerequisite Import"
+  
+  # Check if should do other management CAT work
+  if [[ "$options" != *"management_mcis_only"* ]]
+  then
+
+    # Setup azure networks
+    azure_clouds=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index clouds "filter[]=cloud_type==azure_v2")
+    if [[ -z "$azure_clouds" ]]
+    then
+        echo "No AzureV2 clouds, the network management CAT will not be executed"
+    else
+        management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Network Setup"
+    fi
+
+    # Setup STs
+    management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux ServerTemplate Setup/Maintenance"
+    management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Docker ServerTemplate Setup/Maintenance"
+    management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Windows ServerTemplate Setup/Maintenance"
+    management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT LAMP ServerTemplates Prerequisite Import"
+  fi
 else
   echo "Skipping management CATs."
 fi
