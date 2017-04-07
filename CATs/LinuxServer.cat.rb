@@ -21,7 +21,7 @@
 
 # Required prolog
 name 'A) Corporate Standard Linux'
-rs_ca_ver 20160622
+rs_ca_ver 20161221
 short_description "![Linux](https://s3.amazonaws.com/rs-pft/cat-logos/linux_logo.png)\n
 Get a Linux Server VM in any of our supported public or private clouds"
 long_description "Launches a Linux server.\n
@@ -54,6 +54,10 @@ parameter "param_instancetype" do
   like $parameters.param_instancetype
 end
 
+parameter "param_numservers" do
+  like $parameters.param_numservers
+end
+
 parameter "param_costcenter" do 
   like $parameters.param_costcenter
 end
@@ -61,10 +65,20 @@ end
 ################################
 # Outputs returned to the user #
 ################################
-output "ssh_link" do
-  label "SSH Link"
+output_set "output_server_ips_private" do
+  condition $invSphere
+  label "Server IP"
   category "Output"
-  description "Use this string to access your server."
+  description "IP address for the server(s)."
+  default_value @linux_server.private_ip_address
+end
+
+output_set "output_server_ips_public" do
+  condition $notInVsphere
+  label "Server IP"
+  category "Output"
+  description "IP address for the server(s)."
+  default_value @linux_server.public_ip_address
 end
 
 output "vmware_note" do
@@ -73,15 +87,6 @@ output "vmware_note" do
   category "Output"
   default_value "Your CloudApp was deployed in a VMware environment on a private network and so is not directly accessible. If you need access to the CloudApp, please contact your RightScale rep for network access."
 end
-
-output "ssh_key_info" do
-  condition $inAzure
-  label "Link to your SSH Key"
-  category "Output"
-  description "Use this link to download your SSH private key and use it to login to the server using provided \"SSH Link\"."
-  default_value "https://my.rightscale.com/global/users/ssh#ssh"
-end
-
 
 ##############
 # MAPPINGS   #
@@ -111,8 +116,8 @@ mapping "map_config" do {
 ############################
 
 ### Server Definition ###
-resource "linux_server", type: "server" do
-  name join(['Linux Server-',last(split(@@deployment.href,"/"))])
+resource "linux_server", type: "server", copies: $param_numservers do
+  name join(['Linux Server-',last(split(@@deployment.href,"/")), "-", copy_index()])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
   network find(map($map_cloud, $param_location, "network"))
@@ -172,6 +177,10 @@ condition "invSphere" do
   like $conditions.invSphere
 end
 
+condition "notInVsphere" do
+  logic_not($invSphere)
+end
+
 condition "inAzure" do
   like $conditions.inAzure
 end 
@@ -191,11 +200,6 @@ end
 operation "enable" do
   description "Get information once the app has been launched"
   definition "enable"
-  
-  # Update the links provided in the outputs.
-  output_mappings do {
-    $ssh_link => $server_access,
-  } end
 end
 
 ##########################
@@ -221,30 +225,5 @@ define enable(@linux_server, $param_costcenter, $inAzure, $invSphere) return $se
     $tags=[join(["costcenter:id=",$param_costcenter])]
     rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
-    # Get the appropriate IP address depending on the environment.
-    if $invSphere
-      # Wait for the server to get the IP address we're looking for.
-      while equals?(@linux_server.current_instance().private_ip_addresses[0], null) do
-        sleep(10)
-      end
-      $server_addr =  @linux_server.current_instance().private_ip_addresses[0]
-    else
-      # Wait for the server to get the IP address we're looking for.
-      while equals?(@linux_server.current_instance().public_ip_addresses[0], null) do
-        sleep(10)
-      end
-      $server_addr =  @linux_server.current_instance().public_ip_addresses[0]
-    end 
-
-    # If deployed in Azure one needs to provide the port mapping that Azure uses.
-    if $inAzure
-       @bindings = rs_cm.clouds.get(href: @linux_server.current_instance().cloud().href).ip_address_bindings(filter: ["instance_href==" + @linux_server.current_instance().href])
-       @binding = select(@bindings, {"private_port":22})
-       $server_addr = $server_addr+":"+@binding.public_port
-    end
-    
-    call account.getUserLogin() retrieve $userlogin
-    
-    $server_access = "ssh://"+$userlogin+"@"+$server_addr
 end 
 

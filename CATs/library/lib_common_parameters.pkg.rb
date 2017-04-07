@@ -12,6 +12,16 @@ parameter "param_location" do
   default "Google"
 end
 
+parameter "param_numservers" do 
+  category "Deployment Options"
+  label "Number of Servers to Launch" 
+  type "number" 
+  min_value 1
+  max_value 5
+  constraint_description "Maximum of 5 servers allowed by this application."
+  default 1
+end
+
 parameter "param_instancetype" do
   category "Deployment Options"
   label "Server Performance Level"
