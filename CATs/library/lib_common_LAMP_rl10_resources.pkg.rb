@@ -28,7 +28,7 @@ resource 'chef_server', type: 'server' do
     'EMAIL_FROM_ADDRESS' => 'text:pft@rightscale.com',
     'CHEF_NOTIFICATON_EMAIL' => 'text:pft@rightscale.com',
     'CHEF_SERVER_FQDN' => 'env:PUBLIC_IP', # Maybe private is better? Maybe we do some DNS here?
-    'CHEF_SERVER_VERSION' => 'text:12.11.1',
+    'CHEF_SERVER_VERSION' => 'text:12.14.0',
     'COOKBOOK_VERSION' => 'text:v1.0.4',
     'CHEF_ORG_NAME' => 'text:pft',
     'CHEF_ADMIN_EMAIL' => 'text:pft@rightscale.com',
