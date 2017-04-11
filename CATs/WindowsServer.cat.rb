@@ -74,6 +74,10 @@ parameter "param_instancetype" do
   like $parameters.param_instancetype
 end
 
+parameter "param_numservers" do
+  like $parameters.param_numservers
+end
+
 parameter "param_username" do 
   category "User Inputs"
   label "Windows Username" 
@@ -104,18 +108,24 @@ end
 ################################
 # Outputs returned to the user #
 ################################
-output "output_server_ip" do
-  label "Server IP"
-  category "Output"
-  description "IP address for the server."
-  default_value @windows_server.public_ip_address
-end
-
 output "output_admin_username" do
   label "Admin Username"
-  category "Output"
+  category "Credentials"
   description "Admin Username to access server."
   default_value $param_username
+end
+
+output "output_admin_password_note" do
+  label "Admin Password Note"
+  category "Credentials"
+  default_value "If you forgot the password, use the \"More Actions\" menu to reset the password."
+end
+
+output_set "output_server_ips_public" do
+  label "Server IP"
+  category "Access Information"
+  description "IP address for the server(s)."
+  default_value @windows_server.public_ip_address
 end
 
 ##############
@@ -177,8 +187,8 @@ end
 ############################
 
 ### Server Definition ###
-resource "windows_server", type: "server" do
-  name join(['win',last(split(@@deployment.href,"/"))])
+resource "windows_server", type: "server", copies: $param_numservers do
+  name join(['win',last(split(@@deployment.href,"/")), "-", copy_index()])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
   network find(map($map_cloud, $param_location, "network"))
