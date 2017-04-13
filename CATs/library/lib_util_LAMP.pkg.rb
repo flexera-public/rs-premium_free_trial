@@ -8,6 +8,7 @@ import "pft/server_templates_utilities"
 import "pft/cloud_utilities"
 import "pft/creds_utilities"
 import "pft/lamp_resources"
+import "pft/err_utilities"
 
 
 define launcher(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do 
@@ -56,7 +57,7 @@ define launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_grou
     sub task_name:"Launch DB" do
       task_label("Launching DB")
       $db_retries = 0 
-      sub on_error: functions.handle_retries($db_retries) do
+      sub on_error: err_utilities.handle_retries($db_retries) do
         $db_retries = $db_retries + 1
         provision(@db_server)
       end
@@ -64,7 +65,7 @@ define launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_grou
     sub task_name:"Launch LB" do
       task_label("Launching LB")
       $lb_retries = 0 
-      sub on_error: functions.handle_retries($lb_retries) do
+      sub on_error: err_utilities.handle_retries($lb_retries) do
         $lb_retries = $lb_retries + 1
         provision(@lb_server)
       end
@@ -73,7 +74,7 @@ define launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_grou
     sub task_name:"Launch Application Tier" do
       task_label("Launching Application Tier")
       $apptier_retries = 0 
-      sub on_error: functions.handle_retries($apptier_retries) do
+      sub on_error: err_utilities.handle_retries($apptier_retries) do
         $apptier_retries = $apptier_retries + 1
         provision(@app_server)
       end

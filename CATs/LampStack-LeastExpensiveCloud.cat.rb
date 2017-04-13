@@ -531,7 +531,6 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   @app_server = $webtier_hash
   @db_server = $db_hash
   
-  
   # At this point we have the server declarations updated with the necessary values from the least expensive cloud search.
   # We've also already provisioned the security groups and ssh keys, etc if needed.
   # So now we are ready to provision the servers. To do so we will use the launch_servers definition for the LAMP stack.
