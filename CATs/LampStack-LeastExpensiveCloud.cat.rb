@@ -24,7 +24,7 @@
 
 
 name 'D) App Stack - Least Expensive Cloud'
-rs_ca_ver 20160622
+rs_ca_ver 20161221
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/best_price_new.png)
 
 Launches a scalable LAMP stack that supports application code updates in least expensive PUBLIC or PRIVATE cloud based on user-specified CPU and RAM."
@@ -33,15 +33,18 @@ Clouds Supported: <B>AWS, Azure, Google, VMware</B>\n
 Pro Tip: Select CPU=1 and RAM=1 to end up in the VMware environment."
 
 import "pft/parameters"
-import "pft/lamp_mappings"
+import "pft/rl10/lamp_parameters", as: "lamp_parameters"
+import "pft/rl10/lamp_outputs", as: "lamp_outputs"
+import "pft/mappings"
+import "pft/rl10/lamp_mappings", as: "lamp_mappings"
+import "pft/conditions"
 import "pft/resources"
-import "pft/lamp_resources"
+import "pft/rl10/lamp_resources", as: "lamp_resources"
 import "pft/server_templates_utilities"
 import "pft/server_array_utilities"
-import "pft/err_utilities"
-import "pft/creds_utilities"
-import "pft/lamp_utilities"
+import "pft/rl10/lamp_utilities", as: "lamp_utilities"
 import "pft/permissions"
+
  
 ##################
 # Permissions    #
@@ -87,15 +90,19 @@ end
 # Outputs returned to the user #
 ################################
 output "site_url" do
-  label "Web Site URL"
-  category "Output"
-  description "Click to see your web site."
+  like $lamp_outputs.site_url
 end
 
 output "lb_status" do
-  label "Load Balancer Status Page" 
-  category "Output"
-  description "Accesses Load Balancer status page"
+  like $lamp_outputs.lb_status
+end
+
+output "app1_github_link" do
+  like $lamp_outputs.app1_github_link
+end
+
+output "app2_github_link" do
+  like $lamp_outputs.app2_github_link
 end
 
 output "vmware_note" do
@@ -187,21 +194,6 @@ output "vmware_instance_price_output" do
   description "VMware instance hourly rate."
 end
 
-output "app1_github_link" do
-  label "Yellow Application Code"
-  category "Code Repositories"
-  description "\"Yellow\" application repo. (The main change is in the style.css file.)"
-  default_value "https://github.com/rightscale/examples/tree/unified_php"
-end
-
-output "app2_github_link" do
-  label "Blue Application Code"
-  category "Code Repositories"
-  description "\"Blue\" application repo. (The main change is in the style.css file.)"
-  default_value "https://github.com/rs-services/rs-premium_free_trial/tree/unified_php_modified"
-end
-
-
 ##############
 # MAPPINGS   #
 ##############
@@ -275,6 +267,26 @@ mapping "map_nulls" do {
 ############################
 
 ### Server Declarations ###
+resource 'chef_server', type: 'server' do
+  like @lamp_resources.chef_server
+  # The following attributes are configured in RCL below once we know which cloud we are using.
+  # So we overwrite some placeholder values for now.
+  cloud map($map_nulls, "place_holder", "null_value")
+  datacenter map($map_nulls, "place_holder", "null_value")
+  instance_type map($map_nulls, "place_holder", "null_value")
+  ssh_key_href map($map_nulls, "place_holder", "null_value")
+  placement_group_href map($map_nulls, "place_holder", "null_value")
+  security_group_hrefs map($map_nulls, "place_holder", "null_value")
+  multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
+  
+  network map($map_cloud, $param_location, "network")
+  subnets [map($map_cloud, $param_location, "subnet")]
+  
+  
+  
+  
+end
+
 resource 'lb_server', type: 'server' do
   like @lamp_resources.lb_server
   # The following attributes are configured in RCL below once we know which cloud we are using.
