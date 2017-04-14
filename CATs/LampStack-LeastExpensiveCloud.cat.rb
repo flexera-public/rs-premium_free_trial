@@ -44,6 +44,7 @@ import "pft/server_templates_utilities"
 import "pft/server_array_utilities"
 import "pft/rl10/lamp_utilities", as: "lamp_utilities"
 import "pft/permissions"
+import "pft/err_utilities"
 
  
 ##################
@@ -75,6 +76,11 @@ end
 
 parameter "param_costcenter" do
   like $parameters.param_costcenter
+end
+
+parameter "param_chef_password" do
+  like $lamp_parameters.param_chef_password
+  operations "launch"
 end
 
 parameter "param_appcode" do 
@@ -278,13 +284,8 @@ resource 'chef_server', type: 'server' do
   placement_group_href map($map_nulls, "place_holder", "null_value")
   security_group_hrefs map($map_nulls, "place_holder", "null_value")
   multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
-  
-  network map($map_cloud, $param_location, "network")
-  subnets [map($map_cloud, $param_location, "subnet")]
-  
-  
-  
-  
+  network_href map($map_nulls, "place_holder", "null_value")
+  subnet_hrefs [map($map_nulls, "place_holder", "null_value")]
 end
 
 resource 'lb_server', type: 'server' do
@@ -298,6 +299,8 @@ resource 'lb_server', type: 'server' do
   placement_group_href map($map_nulls, "place_holder", "null_value")
   security_group_hrefs map($map_nulls, "place_holder", "null_value")
   multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
+  network_href map($map_nulls, "place_holder", "null_value")
+  subnet_hrefs [map($map_nulls, "place_holder", "null_value")]
 end
 
 resource 'db_server', type: 'server' do
@@ -311,6 +314,8 @@ resource 'db_server', type: 'server' do
   placement_group_href map($map_nulls, "place_holder", "null_value")
   security_group_hrefs map($map_nulls, "place_holder", "null_value")
   multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
+  network_href map($map_nulls, "place_holder", "null_value")
+  subnet_hrefs [map($map_nulls, "place_holder", "null_value")]
 end
 
 resource 'app_server', type: 'server_array' do
@@ -324,6 +329,8 @@ resource 'app_server', type: 'server_array' do
   placement_group_href map($map_nulls, "place_holder", "null_value")
   security_group_hrefs map($map_nulls, "place_holder", "null_value")
   multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
+  network_href map($map_nulls, "place_holder", "null_value")
+  subnet_hrefs [map($map_nulls, "place_holder", "null_value")]
 end
 
 ## TO-DO: Set up separate security groups for each tier with rules that allow the applicable port(s) only from the IP of the given tier server(s)
@@ -334,6 +341,14 @@ end
 
 resource "sec_group_rule_http", type: "security_group_rule" do
   like @lamp_resources.sec_group_rule_http
+end
+
+resource "sec_group_rule_https", type: "security_group_rule" do
+  like @lamp_resources.sec_group_rule_https
+end
+
+resource "sec_group_rule_ssh", type: "security_group_rule" do
+  like @lamp_resources.sec_group_rule_ssh
 end
 
 resource "sec_group_rule_http8080", type: "security_group_rule" do
@@ -417,7 +432,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram, $param_costcenter)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
+define launch_servers(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram, $param_costcenter)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
 
   # Calculate where to launch the system
 
@@ -495,6 +510,11 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
   @placement_group = $resource_hash  
   
+  $chef_hash = to_object(@chef_server)
+  $chef_hash["fields"]["cloud_href"] = $cheapest_cloud_href
+  $chef_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
+  $chef_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href 
+  
   $lb_hash = to_object(@lb_server)
   $lb_hash["fields"]["cloud_href"] = $cheapest_cloud_href
   $lb_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
@@ -511,13 +531,33 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   $db_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href     
     
   if map($map_cloud, $param_location, "zone")   
+    $chef_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
     $lb_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
     $webtier_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
     $db_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
   end
   
+  if map($map_cloud, $param_location, "network")   
+    @network = find("networks",map($map_cloud, $param_location, "network"))
+    $network_href = @network.href
+    $chef_hash["fields"]["network_href"] = $network_href
+    $lb_hash["fields"]["network_href"] = $network_href
+    $webtier_hash["fields"]["network_href"] = $network_href
+    $db_hash["fields"]["network_href"] = $network_href
+  end
+  
+  if map($map_cloud, $param_location, "subnet")   
+    @subnet = find("subnets",map($map_cloud, $param_location, "subnet"))
+    $subnet_href = @subnet.href
+    $chef_hash["fields"]["subnet_hrefs"] = $subnet_href
+    $lb_hash["fields"]["subnet_hrefs"] = $subnet_href
+    $webtier_hash["fields"]["subnet_hrefs"] = $subnet_href
+    $db_hash["fields"]["subnet_hrefs"] = $subnet_href
+  end
+  
   if map($map_cloud, $param_location, "ssh_key")
     provision(@ssh_key)
+    $chef_hash["fields"]["ssh_key_href"] = @ssh_key.href
     $lb_hash["fields"]["ssh_key_href"] = @ssh_key.href
     $webtier_hash["fields"]["ssh_key_href"] = @ssh_key.href
     $db_hash["fields"]["ssh_key_href"] = @ssh_key.href
@@ -525,6 +565,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   
   if map($map_cloud, $param_location, "pg") 
     provision(@placement_group)
+    $chef_hash["fields"]["ssh_key_href"] = @ssh_key.href
     $lb_hash["fields"]["placement_group_href"] = @placement_group.href
     $webtier_hash["fields"]["placement_group_href"] = @placement_group.href
     $db_hash["fields"]["placement_group_href"] = @placement_group.href
@@ -534,11 +575,13 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
     provision(@sec_group_rule_http)
     provision(@sec_group_rule_http8080)
     provision(@sec_group_rule_mysql)
+    $chef_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
     $lb_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
     $webtier_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
     $db_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
   end
   
+  @chef_server = $chef_hash
   @lb_server = $lb_hash  
   @app_server = $webtier_hash
   @db_server = $db_hash
@@ -549,7 +592,7 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   # But we need to work around a couple of things. First of all the security groups and stuff are already provisioned, so we pass "false" for the parameters that would cause launch_servers() to try and (re)provision them.
   # And similarly, we retrieve fake values for these resources so we don't mess up the originals.
   # We also don't have the standard conditions around $inAzure and $inVMware so we evaluate things and pass those results.
-  call lamp_utilities.launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, equals?($param_location,"Azure"), equals?($param_location,"VMware"), false, false, false)  retrieve @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
+  call lamp_utilities.launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $param_location, equals?($param_location,"Azure"), equals?($param_location,"VMware"), false, false, false)  retrieve @chef_serer, @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
 
   call calc_app_cost(@app_server) retrieve $app_cost
   
