@@ -45,7 +45,7 @@ import "pft/server_array_utilities"
 import "pft/rl10/lamp_utilities", as: "lamp_utilities"
 import "pft/permissions"
 import "pft/err_utilities"
-
+import "pft/creds_utilities"
  
 ##################
 # Permissions    #
@@ -575,6 +575,8 @@ define launch_servers(@chef_server, @lb_server, @app_server, @db_server, @ssh_ke
     provision(@sec_group_rule_http)
     provision(@sec_group_rule_http8080)
     provision(@sec_group_rule_mysql)
+    provision(@sec_group_rule_ssh)
+    provision(@sec_group_rule_https)
     $chef_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
     $lb_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
     $webtier_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
@@ -592,7 +594,8 @@ define launch_servers(@chef_server, @lb_server, @app_server, @db_server, @ssh_ke
   # But we need to work around a couple of things. First of all the security groups and stuff are already provisioned, so we pass "false" for the parameters that would cause launch_servers() to try and (re)provision them.
   # And similarly, we retrieve fake values for these resources so we don't mess up the originals.
   # We also don't have the standard conditions around $inAzure and $inVMware so we evaluate things and pass those results.
-  call lamp_utilities.launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $param_location, equals?($param_location,"Azure"), equals?($param_location,"VMware"), false, false, false)  retrieve @chef_serer, @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
+  call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
+  call lamp_utilities.launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, equals?($param_location,"Azure"), equals?($param_location,"VMware"), false, false, false, $cheapest_cloud)  retrieve @chef_serer, @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
 
   call calc_app_cost(@app_server) retrieve $app_cost
   
@@ -707,7 +710,6 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      # Also the Google price_hash does not have a local_disk_size attribute so we can't just look at that.
      # Hence a multidimensional condition test
      if logic_or(logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), $found_cloud_vendor == "VMware"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
-#       call err_utilities.log(join(["found a valid price_hash for ", $found_cloud_vendor]), to_s($price_hash))
 
        $purchase_options = keys($price_hash["purchase_option"])
          
@@ -716,7 +718,8 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
        $memory = to_n($price_hash["priceable_resource"]["memory"])
        if $memory >= to_n($ram_count)
          # then it's a contender
-       
+         # call err_utilities.log(join(["found a contender price_hash for ", $found_cloud_vendor]), to_s($price_hash))
+
            # There may be more than one usage_charge elements in the returned array. So find one that is NOT an option since this is the base price we'll be using
            $price = ""
            foreach $usage_charge in $price_hash["usage_charges"] do
@@ -730,7 +733,6 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
              # Even if it's cheaper, make sure it's a supported instance type 
              call checkInstanceType($price_hash["purchase_option"]["cloud_href"], $price_hash["priceable_resource"]["name"], $supported_instance_types_hash) retrieve $supported_instance_types_hash, $usableInstanceType
              if $usableInstanceType # the pricing API returned an instance type that is supported for the account
-             
                $cloud_best_price = to_n($price)
                $cloud_href = $price_hash["purchase_option"]["cloud_href"]
                $instance_type = $price_hash["priceable_resource"]["name"]
@@ -749,6 +751,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
                  "cloud_href": $cloud_href,
                  "instance_type": $instance_type,
                  "instance_type_href": $instance_type_href,
+                 "datacenter_name" : $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"], # carry the datacenter_name in case there's another hit for this cloud vendor
                  "datacenter_href": $datacenter_href
                }
                $cloud_costs_hash[$found_cloud_vendor] = $cloud_info
