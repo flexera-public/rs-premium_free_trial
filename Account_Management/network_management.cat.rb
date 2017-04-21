@@ -68,13 +68,17 @@ define setup_networks(@base_network, @base_subnet) do
     
   concurrent foreach @arm_cloud in @arm_clouds do
     $arm_cloud_href = @arm_cloud.href
+    $arm_cloud_name = @arm_cloud.name
     if logic_not(contains?($current_pft_arm_network_cloud_hrefs, [$arm_cloud_href]))
       $new_network = $base_network_hash
       $new_network["fields"]["cloud_href"] = $arm_cloud_href
       $new_network["fields"]["deployment_href"] = null
       @new_network = $new_network
-      call debug.log("NETWORK SETUP: Provisioning pft_arm_network in cloud: "+@arm_cloud.name+", href: "+$arm_cloud_href, to_s(to_object(@new_network)))
-      provision(@new_network)
+      call debug.log("NETWORK SETUP: Provisioning pft_arm_network in cloud: "+$arm_cloud_name+", href: "+$arm_cloud_href, to_s(to_object(@new_network)))
+      
+      sub on_error: wait_and_retry($arm_cloud_name, "NETWORK") do
+        provision(@new_network)
+      end
       
       $new_network_href = @new_network.href
       
@@ -83,11 +87,11 @@ define setup_networks(@base_network, @base_subnet) do
       $default_subnet["fields"]["network_href"] = $new_network_href
       $default_subnet["fields"]["deployment_href"] = null
       @default_subnet = $default_subnet
-      call debug.log("NETWORK SETUP: Provisioning default subnet in network: "+$new_network_href, to_s(to_object(@default_subnet)))
+      call debug.log("NETWORK SETUP: Provisioning default subnet in cloud: "+$arm_cloud_name, to_s(to_object(@default_subnet)))
   
       # Sometimes the network is not yet presented by AzureRM and so the provision of the subnet fails.
       # If it does, wait a bit and try again.
-      sub on_error: wait_and_retry($arm_cloud_href) do
+      sub on_error: wait_and_retry($arm_cloud_name, "SUBNET") do
         provision(@default_subnet)
       end
 
@@ -95,8 +99,8 @@ define setup_networks(@base_network, @base_subnet) do
   end
 end
 
-define wait_and_retry($item) do
-  call debug.log("RETRYING provision of subnet in cloud: "+$item, "")
+define wait_and_retry($cloud_name, $object_type) do
+  call debug.log("RETRYING provision of "+$object_type+" in cloud: "+$cloud_name, "")
   sleep(5)
   $_error_behavior = "retry"
 end
