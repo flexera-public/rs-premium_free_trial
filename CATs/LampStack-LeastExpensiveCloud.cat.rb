@@ -213,16 +213,20 @@ mapping "map_cloud" do {
     "sg" => '@sec_group',  
     "ssh_key" => "@ssh_key",
     "pg" => null,
+    "network" => null,
+    "subnet" => null,
     "mci_mapping" => "Public",
   },
   "Azure" => {   
     "cloud_provider" => "Microsoft Azure",
-    "cloud_type" => "azure",
+    "cloud_type" => "azure_v2",
     "zone" => null,
     "sg" => null, 
     "ssh_key" => null,
-    "pg" => "@placement_group",
-    "mci_mapping" => "Public",
+    "pg" => null,
+    "network" => "pft_arm_network",
+    "subnet" => "default",
+    "mci_mapping" => "Public", 
   },
   "Google" => {
     "cloud_provider" => "Google",
@@ -231,6 +235,8 @@ mapping "map_cloud" do {
     "sg" => '@sec_group',  
     "ssh_key" => null,
     "pg" => null,
+    "network" => null,
+    "subnet" => null,
     "mci_mapping" => "Public",
   },
   "VMware" => {
@@ -240,6 +246,8 @@ mapping "map_cloud" do {
     "sg" => null, 
     "ssh_key" => "@ssh_key",
     "pg" => null,
+    "network" => null,
+    "subnet" => null,
     "mci_mapping" => "VMware",
   }
 }
@@ -496,79 +504,66 @@ define launch_servers(@chef_server, @lb_server, @app_server, @db_server, @ssh_ke
   $multi_cloud_image_href = @multi_cloud_image.href
       
   # modify resources with the cheapest cloud
-  $resource_hash = to_object(@ssh_key)
-
-  $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-
-  @ssh_key = $resource_hash
+  $update_hash = { "cloud_href": $cheapest_cloud_href }
+  call modify_resource_definition(@ssh_key, $update_hash) retrieve @ssh_key
+  call modify_resource_definition(@sec_group, $update_hash) retrieve @sec_group
+  call modify_resource_definition(@placement_group, $update_hash) retrieve @placement_group
   
-  $resource_hash = to_object(@sec_group)
-  $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  @sec_group = $resource_hash  
-  
-  $resource_hash = to_object(@placement_group)
-  $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  @placement_group = $resource_hash  
-  
-  $chef_hash = to_object(@chef_server)
-  $chef_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  $chef_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
-  $chef_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href 
-  
-  $lb_hash = to_object(@lb_server)
-  $lb_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  $lb_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
-  $lb_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href
-    
-  $webtier_hash = to_object(@app_server)
-  $webtier_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  $webtier_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
-  $webtier_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href
-    
-  $db_hash = to_object(@db_server)
-  $db_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  $db_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
-  $db_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href     
-    
-  if map($map_cloud, $param_location, "zone")   
-    $chef_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
-    $lb_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
-    $webtier_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
-    $db_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
+  $update_hash = { "multi_cloud_image_href":$multi_cloud_image_href, "instance_type_href":$cheapest_instance_type_href} + $update_hash 
+  call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+  call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+  call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+  call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
+   
+  if map($map_cloud, $param_location, "zone")  
+    $update_hash = { "datacenter_href":$cheapest_datacenter_href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
-  if map($map_cloud, $param_location, "network")   
-    @network = find("networks",map($map_cloud, $param_location, "network"))
+  $network_href = ""
+  if map($map_cloud, $param_location, "network")  
+    @network = find("networks", { name: map($map_cloud, $param_location, "network"), cloud_href: $cheapest_cloud_href })
     $network_href = @network.href
-    $chef_hash["fields"]["network_href"] = $network_href
-    $lb_hash["fields"]["network_href"] = $network_href
-    $webtier_hash["fields"]["network_href"] = $network_href
-    $db_hash["fields"]["network_href"] = $network_href
+     
+    $update_hash = { "network_href":$network_href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
-  if map($map_cloud, $param_location, "subnet")   
-    @subnet = find("subnets",map($map_cloud, $param_location, "subnet"))
-    $subnet_href = @subnet.href
-    $chef_hash["fields"]["subnet_hrefs"] = $subnet_href
-    $lb_hash["fields"]["subnet_hrefs"] = $subnet_href
-    $webtier_hash["fields"]["subnet_hrefs"] = $subnet_href
-    $db_hash["fields"]["subnet_hrefs"] = $subnet_href
+  if map($map_cloud, $param_location, "subnet")       
+    @subnet = find("subnets", { name:map($map_cloud, $param_location, "subnet"),  network_href: $network_href })
+    $subnet_href = @subnet.href[]
+
+    $update_hash = { "subnet_hrefs":$subnet_href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
   if map($map_cloud, $param_location, "ssh_key")
     provision(@ssh_key)
-    $chef_hash["fields"]["ssh_key_href"] = @ssh_key.href
-    $lb_hash["fields"]["ssh_key_href"] = @ssh_key.href
-    $webtier_hash["fields"]["ssh_key_href"] = @ssh_key.href
-    $db_hash["fields"]["ssh_key_href"] = @ssh_key.href
+    
+    $update_hash = { "ssh_key_href":@ssh_key.href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
   if map($map_cloud, $param_location, "pg") 
     provision(@placement_group)
-    $chef_hash["fields"]["ssh_key_href"] = @ssh_key.href
-    $lb_hash["fields"]["placement_group_href"] = @placement_group.href
-    $webtier_hash["fields"]["placement_group_href"] = @placement_group.href
-    $db_hash["fields"]["placement_group_href"] = @placement_group.href
+    
+    $update_hash = { "placement_group_href":@placement_group.href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
   if map($map_cloud, $param_location, "sg")
@@ -577,17 +572,16 @@ define launch_servers(@chef_server, @lb_server, @app_server, @db_server, @ssh_ke
     provision(@sec_group_rule_mysql)
     provision(@sec_group_rule_ssh)
     provision(@sec_group_rule_https)
-    $chef_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
-    $lb_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
-    $webtier_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
-    $db_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
+    
+    $update_hash = { "security_group_hrefs":[@sec_group.href] }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
-  @chef_server = $chef_hash
-  @lb_server = $lb_hash  
-  @app_server = $webtier_hash
-  @db_server = $db_hash
-  
+#  call err_utilities.log("chef_sever object hash", to_s(to_object(@chef_server)))
+    
   # At this point we have the server declarations updated with the necessary values from the least expensive cloud search.
   # We've also already provisioned the security groups and ssh keys, etc if needed.
   # So now we are ready to provision the servers. To do so we will use the launch_servers definition for the LAMP stack.
@@ -600,6 +594,15 @@ define launch_servers(@chef_server, @lb_server, @app_server, @db_server, @ssh_ke
   call calc_app_cost(@app_server) retrieve $app_cost
   
 end 
+
+# Modify the resource's declaration with the applicable bits given in the $update_hash
+define modify_resource_definition(@resource, $update_hash) return @resource do
+  $resource_hash = to_object(@resource)
+  foreach $field in keys($update_hash) do
+    $resource_hash["fields"][$field] = $update_hash[$field]
+  end
+  @resource = $resource_hash
+end
 
 
 # Calculate the cost of using the different clouds found in the $map_cloud mapping
@@ -636,6 +639,10 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
     $cloud_href_array = rs_cm.clouds.get(filter: [ join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")]) ]).href[]
     $cloud_href_filter = $cloud_href_filter + $cloud_href_array
   end
+  
+### TESTING - LIMIT TO ONE CLOUD FOR TESTING
+  $cloud_href_filter = rs_cm.clouds.get(filter: [ "cloud_type==azure_v2" ]).href[]
+
   
   call err_utilities.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
 
@@ -729,12 +736,22 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
            
            # Is it cheapest so far?
            if to_n($price) < $cloud_costs_hash[$found_cloud_vendor]["price"]
+
+             if ($found_cloud_vendor == "Microsoft Azure")
+                $instance_type_name = $price_hash["priceable_resource"]["name"]
+                $instance_type_name = gsub($instance_type_name, " ", "_")
+                if !($instance_type_name =~ /^Basic/)
+                  $instance_type_name = "Standard_"+$instance_type_name
+                end
+                $price_hash["priceable_resource"]["name"] = $instance_type_name
+             end
              
              # Even if it's cheaper, make sure it's a supported instance type 
              call checkInstanceType($price_hash["purchase_option"]["cloud_href"], $price_hash["priceable_resource"]["name"], $supported_instance_types_hash) retrieve $supported_instance_types_hash, $usableInstanceType
              if $usableInstanceType # the pricing API returned an instance type that is supported for the account
                $cloud_best_price = to_n($price)
                $cloud_href = $price_hash["purchase_option"]["cloud_href"]
+
                $instance_type = $price_hash["priceable_resource"]["name"]
                @cloud = rs_cm.clouds.get(href: $cloud_href)
                $instance_type_href = @cloud.instance_types(filter: [join(["name==",$instance_type])]).href
@@ -804,7 +821,7 @@ define checkInstanceType($cloud_href, $instance_type, $supported_instance_types_
     $instance_type_names=@instance_types.name[]
     $supported_instance_types_hash[$cloud_href] = $instance_type_names
     
-#    call err_utilities.log(join(["Gathered instance types for cloud, ", $cloud_href]), to_s($instance_type_names))
+    #call err_utilities.log("Gathered instance types for cloud, "+@cloud.name+", cloud_href: "+$cloud_href, to_s($instance_type_names))
   end
   
   # Check if the instance type found in the pricing API is a supported instance type
