@@ -93,7 +93,7 @@ fi
 if [[ "$options" == *"all"* || "$options" == *"sts"* ]]
 then
   echo "Checking for Chef Server Template. This is a prerequsite to importing the ServerTemplates."
-  chef_server_response=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index server_templates "filter[]=name==Chef Server for Linux (RightLink 10)" "filter[]=revision==10")
+  chef_server_response=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index server_templates "filter[]=name==Chef Server for Linux (RightLink 10)" "filter[]=revision==15")
   if [[ -z "$chef_server_response" ]]
   then
     echo "We need you to complete one manual step first. Go import the Chef Server for Linux (RightLink 10) and accept the EULA. Here's a handy link - http://www.rightscale.com/library/server_templates/Chef-Server-for-Linux-RightLin/lineage/57238"
@@ -151,7 +151,7 @@ management_cat_launch_wait_terminate_delete() {
 if [[ "$options" == *"all"* || "$options" == *"cats"* ]]
 then
   echo "Upserting CAT and library files."
- 
+
   for i in `cat $cat_list_file`
   do
     cat_filename=$(echo $i | sed -e "s/CAT_LIST_MODIFIER/$CAT_LIST_MODIFIER/g")
@@ -175,11 +175,11 @@ fi
 if [[ "$options" == *"all"* || "$options" == *"management"* ]]
 then
   echo "Launching management CATs."
-  
+
   # Do MCI work regardless
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Linux MCI Setup/Maintenance"
   management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Base Windows MCI Setup/Maintenance"
-  
+
   # Check if should do other management CAT work
   if [[ "$options" != *"management_mcis_only"* ]]
   then
@@ -258,7 +258,7 @@ fi
 if [[ "$options" == *"all"* || "$options" == *"publish"* ]]
 then
   echo "Publishing CATs."
-  
+
   # get the schedule ID needed for publishing
   schedule_id=$(rsc --pp -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME --xm ':has(.name:val("Business Hours"))>.id' ss index /designer/collections/$ACCOUNT_ID/schedules | sed 's/"//g')
   if [[ -z "$schedule_id" ]]
@@ -266,7 +266,7 @@ then
     echo "Need Business Hours schedule. Run \"$0 schedule\" "
     exit 1
   fi
-        
+
   for i in `cat $cat_list_file`
   do
     cat_filename=$i
@@ -301,4 +301,3 @@ then
 else
   echo "Skipping CAT publication."
 fi
-
