@@ -62,16 +62,17 @@ parameter "param_cpu" do
   label "Minimum Number of vCPUs" 
   type "number" 
   description "Minimum number of vCPUs needed for the application." 
-  allowed_values 1, 2, 4, 8
+  allowed_values 2, 4, 8
   default 2
 end
 
 parameter "param_ram" do 
   category "User Inputs"
   label "Minimum Amount of RAM" 
-  type "string" 
+  type "number"
   description "Minimum amount of RAM in GBs needed for the application." 
-  default "2"
+  min_value 2 # The Chef server is not happy with less than 2GB of RAM.
+  default 2
 end
 
 parameter "param_costcenter" do
@@ -239,7 +240,7 @@ mapping "map_cloud" do {
     "subnet" => null,
     "mci_mapping" => "Public",
   },
-  "VMware" => {
+  "VMware" => {  
     "cloud_provider" => "VMware",
     "cloud_type" => "vscale",
     "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified.
@@ -411,6 +412,11 @@ operation "launch" do
     $vmware_instance_type_output => $vmware_instance_type,
     $vmware_instance_price_output => $vmware_instance_price
   } end
+end
+
+operation "terminate" do
+  description "Clean up a few unique items"
+  definition "lamp_utilities.delete_resources"
 end
 
 operation "update_app_code" do
@@ -589,7 +595,7 @@ define launch_servers(@chef_server, @lb_server, @app_server, @db_server, @ssh_ke
   # And similarly, we retrieve fake values for these resources so we don't mess up the originals.
   # We also don't have the standard conditions around $inAzure and $inVMware so we evaluate things and pass those results.
   call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
-  call lamp_utilities.launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, equals?($param_location,"Azure"), equals?($param_location,"VMware"), false, false, false, $cheapest_cloud)  retrieve @chef_serer, @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
+  call lamp_utilities.launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, false, equals?($param_location,"VMware"), false, false, false, $cheapest_cloud)  retrieve @chef_serer, @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
 
   call calc_app_cost(@app_server) retrieve $app_cost
   
@@ -640,10 +646,9 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
     $cloud_href_filter = $cloud_href_filter + $cloud_href_array
   end
   
-### TESTING - LIMIT TO ONE CLOUD FOR TESTING
-  $cloud_href_filter = rs_cm.clouds.get(filter: [ "cloud_type==azure_v2" ]).href[]
+  ### FOR TESTING - LIMIT TO ONE CLOUD FOR TESTING: cloud type: azure_v2, google, amazon
+#  $cloud_href_filter = rs_cm.clouds.get(filter: [ "cloud_type==amazon" ]).href[]
 
-  
   call err_utilities.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
 
    # Build an array of cpu counts for the pricing API filter
@@ -716,7 +721,9 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      # But we need to avoid looking at AWS EBS-backed instance types since we currently use an MCI that requires ephemeral disk based instance types in AWS.
      # Also the Google price_hash does not have a local_disk_size attribute so we can't just look at that.
      # Hence a multidimensional condition test
-     if logic_or(logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), $found_cloud_vendor == "VMware"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
+#     if logic_or(logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), $found_cloud_vendor == "VMware"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
+    ### TODO support VMware
+    if logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
 
        $purchase_options = keys($price_hash["purchase_option"])
          
@@ -775,7 +782,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
              end # usable instance type check
            end # price comparison
        end # RAM check
-     end # EBS-backed instance type test
+    end # EBS-backed instance type test
    end # price_hash loop
 end
 
@@ -797,14 +804,14 @@ define calc_app_cost(@web_tier) return $app_cost do
     end
   end
   
-  if $instance_cost  # Then we have instance cost informatin and so can calculate application cost
+  if $instance_cost  # Then we have instance cost information and so can calculate application cost
     # see how many web server instances there are
     @web_servers = select(@web_tier.current_instances(), {"state":"/^(operational|stranded)/"})
     $num_web_servers = size(@web_servers)
     # Ruby floating point arithmetic can cause strange results. Google it.
     # So to deal with it, we turn everything into an integer when doing the multiplications and then bring it back down to dollars and cents at the end.
     # We multiply/divide by 1000 to account for some of the pricing out there that goes to half-cents.
-    $calculated_app_cost = (($num_web_servers + 2) * ($instance_cost * 1000))/1000  
+    $calculated_app_cost = (($num_web_servers + 3) * ($instance_cost * 1000))/1000  
     $app_cost = to_s($calculated_app_cost)
   end
   
