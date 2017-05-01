@@ -24,7 +24,7 @@
 
 
 name 'D) App Stack - Least Expensive Cloud'
-rs_ca_ver 20160622
+rs_ca_ver 20161221
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/best_price_new.png)
 
 Launches a scalable LAMP stack that supports application code updates in least expensive PUBLIC or PRIVATE cloud based on user-specified CPU and RAM."
@@ -33,15 +33,19 @@ Clouds Supported: <B>AWS, Azure, Google, VMware</B>\n
 Pro Tip: Select CPU=1 and RAM=1 to end up in the VMware environment."
 
 import "pft/parameters"
-import "pft/lamp_mappings"
+import "pft/rl10/lamp_parameters", as: "lamp_parameters"
+import "pft/rl10/lamp_outputs", as: "lamp_outputs"
+import "pft/mappings"
+import "pft/rl10/lamp_mappings", as: "lamp_mappings"
+import "pft/conditions"
 import "pft/resources"
-import "pft/lamp_resources"
+import "pft/rl10/lamp_resources", as: "lamp_resources"
 import "pft/server_templates_utilities"
 import "pft/server_array_utilities"
+import "pft/rl10/lamp_utilities", as: "lamp_utilities"
+import "pft/permissions"
 import "pft/err_utilities"
 import "pft/creds_utilities"
-import "pft/lamp_utilities"
-import "pft/permissions"
  
 ##################
 # Permissions    #
@@ -58,20 +62,26 @@ parameter "param_cpu" do
   label "Minimum Number of vCPUs" 
   type "number" 
   description "Minimum number of vCPUs needed for the application." 
-  allowed_values 1, 2, 4, 8
+  allowed_values 2, 4, 8
   default 2
 end
 
 parameter "param_ram" do 
   category "User Inputs"
   label "Minimum Amount of RAM" 
-  type "string" 
+  type "number"
   description "Minimum amount of RAM in GBs needed for the application." 
-  default "2"
+  min_value 2 # The Chef server is not happy with less than 2GB of RAM.
+  default 2
 end
 
 parameter "param_costcenter" do
   like $parameters.param_costcenter
+end
+
+parameter "param_chef_password" do
+  like $lamp_parameters.param_chef_password
+  operations "launch"
 end
 
 parameter "param_appcode" do 
@@ -87,15 +97,19 @@ end
 # Outputs returned to the user #
 ################################
 output "site_url" do
-  label "Web Site URL"
-  category "Output"
-  description "Click to see your web site."
+  like $lamp_outputs.site_url
 end
 
 output "lb_status" do
-  label "Load Balancer Status Page" 
-  category "Output"
-  description "Accesses Load Balancer status page"
+  like $lamp_outputs.lb_status
+end
+
+output "app1_github_link" do
+  like $lamp_outputs.app1_github_link
+end
+
+output "app2_github_link" do
+  like $lamp_outputs.app2_github_link
 end
 
 output "vmware_note" do
@@ -187,21 +201,6 @@ output "vmware_instance_price_output" do
   description "VMware instance hourly rate."
 end
 
-output "app1_github_link" do
-  label "Yellow Application Code"
-  category "Code Repositories"
-  description "\"Yellow\" application repo. (The main change is in the style.css file.)"
-  default_value "https://github.com/rightscale/examples/tree/unified_php"
-end
-
-output "app2_github_link" do
-  label "Blue Application Code"
-  category "Code Repositories"
-  description "\"Blue\" application repo. (The main change is in the style.css file.)"
-  default_value "https://github.com/rs-services/rs-premium_free_trial/tree/unified_php_modified"
-end
-
-
 ##############
 # MAPPINGS   #
 ##############
@@ -215,16 +214,20 @@ mapping "map_cloud" do {
     "sg" => '@sec_group',  
     "ssh_key" => "@ssh_key",
     "pg" => null,
+    "network" => null,
+    "subnet" => null,
     "mci_mapping" => "Public",
   },
   "Azure" => {   
     "cloud_provider" => "Microsoft Azure",
-    "cloud_type" => "azure",
+    "cloud_type" => "azure_v2",
     "zone" => null,
     "sg" => null, 
     "ssh_key" => null,
-    "pg" => "@placement_group",
-    "mci_mapping" => "Public",
+    "pg" => null,
+    "network" => "pft_arm_network",
+    "subnet" => "default",
+    "mci_mapping" => "Public", 
   },
   "Google" => {
     "cloud_provider" => "Google",
@@ -233,15 +236,19 @@ mapping "map_cloud" do {
     "sg" => '@sec_group',  
     "ssh_key" => null,
     "pg" => null,
+    "network" => null,
+    "subnet" => null,
     "mci_mapping" => "Public",
   },
-  "VMware" => {
+  "VMware" => {  
     "cloud_provider" => "VMware",
     "cloud_type" => "vscale",
     "zone" => "VMware_Zone_1", # launches in vSphere require a zone being specified.
     "sg" => null, 
     "ssh_key" => "@ssh_key",
     "pg" => null,
+    "network" => null,
+    "subnet" => null,
     "mci_mapping" => "VMware",
   }
 }
@@ -275,6 +282,21 @@ mapping "map_nulls" do {
 ############################
 
 ### Server Declarations ###
+resource 'chef_server', type: 'server' do
+  like @lamp_resources.chef_server
+  # The following attributes are configured in RCL below once we know which cloud we are using.
+  # So we overwrite some placeholder values for now.
+  cloud map($map_nulls, "place_holder", "null_value")
+  datacenter map($map_nulls, "place_holder", "null_value")
+  instance_type map($map_nulls, "place_holder", "null_value")
+  ssh_key_href map($map_nulls, "place_holder", "null_value")
+  placement_group_href map($map_nulls, "place_holder", "null_value")
+  security_group_hrefs map($map_nulls, "place_holder", "null_value")
+  multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
+  network_href map($map_nulls, "place_holder", "null_value")
+  subnet_hrefs [map($map_nulls, "place_holder", "null_value")]
+end
+
 resource 'lb_server', type: 'server' do
   like @lamp_resources.lb_server
   # The following attributes are configured in RCL below once we know which cloud we are using.
@@ -286,6 +308,8 @@ resource 'lb_server', type: 'server' do
   placement_group_href map($map_nulls, "place_holder", "null_value")
   security_group_hrefs map($map_nulls, "place_holder", "null_value")
   multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
+  network_href map($map_nulls, "place_holder", "null_value")
+  subnet_hrefs [map($map_nulls, "place_holder", "null_value")]
 end
 
 resource 'db_server', type: 'server' do
@@ -299,6 +323,8 @@ resource 'db_server', type: 'server' do
   placement_group_href map($map_nulls, "place_holder", "null_value")
   security_group_hrefs map($map_nulls, "place_holder", "null_value")
   multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
+  network_href map($map_nulls, "place_holder", "null_value")
+  subnet_hrefs [map($map_nulls, "place_holder", "null_value")]
 end
 
 resource 'app_server', type: 'server_array' do
@@ -312,6 +338,8 @@ resource 'app_server', type: 'server_array' do
   placement_group_href map($map_nulls, "place_holder", "null_value")
   security_group_hrefs map($map_nulls, "place_holder", "null_value")
   multi_cloud_image_href map($map_nulls, "place_holder", "null_value")
+  network_href map($map_nulls, "place_holder", "null_value")
+  subnet_hrefs [map($map_nulls, "place_holder", "null_value")]
 end
 
 ## TO-DO: Set up separate security groups for each tier with rules that allow the applicable port(s) only from the IP of the given tier server(s)
@@ -322,6 +350,14 @@ end
 
 resource "sec_group_rule_http", type: "security_group_rule" do
   like @lamp_resources.sec_group_rule_http
+end
+
+resource "sec_group_rule_https", type: "security_group_rule" do
+  like @lamp_resources.sec_group_rule_https
+end
+
+resource "sec_group_rule_ssh", type: "security_group_rule" do
+  like @lamp_resources.sec_group_rule_ssh
 end
 
 resource "sec_group_rule_http8080", type: "security_group_rule" do
@@ -378,6 +414,11 @@ operation "launch" do
   } end
 end
 
+operation "terminate" do
+  description "Clean up a few unique items"
+  definition "lamp_utilities.delete_resources"
+end
+
 operation "update_app_code" do
   label "Update Application Code"
   description "Select and install a different repo and branch of code."
@@ -405,7 +446,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram, $param_costcenter)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
+define launch_servers(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $map_cloud, $map_st, $map_mci, $map_db_creds, $param_cpu, $param_ram, $param_costcenter)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $param_location, $site_link, $lb_status_link, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
 
   # Calculate where to launch the system
 
@@ -469,79 +510,105 @@ define launch_servers(@lb_server, @app_server, @db_server, @ssh_key, @sec_group,
   $multi_cloud_image_href = @multi_cloud_image.href
       
   # modify resources with the cheapest cloud
-  $resource_hash = to_object(@ssh_key)
+  $update_hash = { "cloud_href": $cheapest_cloud_href }
+  call modify_resource_definition(@ssh_key, $update_hash) retrieve @ssh_key
+  call modify_resource_definition(@sec_group, $update_hash) retrieve @sec_group
+  call modify_resource_definition(@placement_group, $update_hash) retrieve @placement_group
+  
+  $update_hash = { "multi_cloud_image_href":$multi_cloud_image_href, "instance_type_href":$cheapest_instance_type_href} + $update_hash 
+  call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+  call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+  call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+  call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
+   
+  if map($map_cloud, $param_location, "zone")  
+    $update_hash = { "datacenter_href":$cheapest_datacenter_href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
+  end
+  
+  $network_href = ""
+  if map($map_cloud, $param_location, "network")  
+    @network = find("networks", { name: map($map_cloud, $param_location, "network"), cloud_href: $cheapest_cloud_href })
+    $network_href = @network.href
+     
+    $update_hash = { "network_href":$network_href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
+  end
+  
+  if map($map_cloud, $param_location, "subnet")       
+    @subnet = find("subnets", { name:map($map_cloud, $param_location, "subnet"),  network_href: $network_href })
+    $subnet_href = @subnet.href[]
 
-  $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-
-  @ssh_key = $resource_hash
-  
-  $resource_hash = to_object(@sec_group)
-  $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  @sec_group = $resource_hash  
-  
-  $resource_hash = to_object(@placement_group)
-  $resource_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  @placement_group = $resource_hash  
-  
-  $lb_hash = to_object(@lb_server)
-  $lb_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  $lb_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
-  $lb_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href
-    
-  $webtier_hash = to_object(@app_server)
-  $webtier_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  $webtier_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
-  $webtier_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href
-    
-  $db_hash = to_object(@db_server)
-  $db_hash["fields"]["cloud_href"] = $cheapest_cloud_href
-  $db_hash["fields"]["multi_cloud_image_href"] = $multi_cloud_image_href
-  $db_hash["fields"]["instance_type_href"] = $cheapest_instance_type_href     
-    
-  if map($map_cloud, $param_location, "zone")   
-    $lb_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
-    $webtier_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
-    $db_hash["fields"]["datacenter_href"] = $cheapest_datacenter_href
+    $update_hash = { "subnet_hrefs":$subnet_href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
   if map($map_cloud, $param_location, "ssh_key")
     provision(@ssh_key)
-    $lb_hash["fields"]["ssh_key_href"] = @ssh_key.href
-    $webtier_hash["fields"]["ssh_key_href"] = @ssh_key.href
-    $db_hash["fields"]["ssh_key_href"] = @ssh_key.href
+    
+    $update_hash = { "ssh_key_href":@ssh_key.href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
   if map($map_cloud, $param_location, "pg") 
     provision(@placement_group)
-    $lb_hash["fields"]["placement_group_href"] = @placement_group.href
-    $webtier_hash["fields"]["placement_group_href"] = @placement_group.href
-    $db_hash["fields"]["placement_group_href"] = @placement_group.href
+    
+    $update_hash = { "placement_group_href":@placement_group.href }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
   if map($map_cloud, $param_location, "sg")
     provision(@sec_group_rule_http)
     provision(@sec_group_rule_http8080)
     provision(@sec_group_rule_mysql)
-    $lb_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
-    $webtier_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
-    $db_hash["fields"]["security_group_hrefs"] = [@sec_group.href]
+    provision(@sec_group_rule_ssh)
+    provision(@sec_group_rule_https)
+    
+    $update_hash = { "security_group_hrefs":[@sec_group.href] }
+    call modify_resource_definition(@chef_server, $update_hash) retrieve @chef_server
+    call modify_resource_definition(@lb_server, $update_hash) retrieve @lb_server
+    call modify_resource_definition(@app_server, $update_hash) retrieve @app_server
+    call modify_resource_definition(@db_server, $update_hash) retrieve @db_server
   end
   
-  @lb_server = $lb_hash  
-  @app_server = $webtier_hash
-  @db_server = $db_hash
-  
+#  call err_utilities.log("chef_sever object hash", to_s(to_object(@chef_server)))
+    
   # At this point we have the server declarations updated with the necessary values from the least expensive cloud search.
   # We've also already provisioned the security groups and ssh keys, etc if needed.
   # So now we are ready to provision the servers. To do so we will use the launch_servers definition for the LAMP stack.
   # But we need to work around a couple of things. First of all the security groups and stuff are already provisioned, so we pass "false" for the parameters that would cause launch_servers() to try and (re)provision them.
   # And similarly, we retrieve fake values for these resources so we don't mess up the originals.
   # We also don't have the standard conditions around $inAzure and $inVMware so we evaluate things and pass those results.
-  call lamp_utilities.launch_resources(@lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_http, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, equals?($param_location,"Azure"), equals?($param_location,"VMware"), false, false, false)  retrieve @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
+  call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
+  call lamp_utilities.launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, false, equals?($param_location,"VMware"), false, false, false, $cheapest_cloud)  retrieve @chef_serer, @lb_server, @app_server, @db_server, @sec_group_fake, @ssh_key_fake, @placement_group_fake, $site_link, $lb_status_link 
 
   call calc_app_cost(@app_server) retrieve $app_cost
   
 end 
+
+# Modify the resource's declaration with the applicable bits given in the $update_hash
+define modify_resource_definition(@resource, $update_hash) return @resource do
+  $resource_hash = to_object(@resource)
+  foreach $field in keys($update_hash) do
+    $resource_hash["fields"][$field] = $update_hash[$field]
+  end
+  @resource = $resource_hash
+end
 
 
 # Calculate the cost of using the different clouds found in the $map_cloud mapping
@@ -579,6 +646,9 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
     $cloud_href_filter = $cloud_href_filter + $cloud_href_array
   end
   
+  ### FOR TESTING - LIMIT TO ONE CLOUD FOR TESTING: cloud type: azure_v2, google, amazon
+#  $cloud_href_filter = rs_cm.clouds.get(filter: [ "cloud_type==amazon" ]).href[]
+
   call err_utilities.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
 
    # Build an array of cpu counts for the pricing API filter
@@ -651,8 +721,9 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      # But we need to avoid looking at AWS EBS-backed instance types since we currently use an MCI that requires ephemeral disk based instance types in AWS.
      # Also the Google price_hash does not have a local_disk_size attribute so we can't just look at that.
      # Hence a multidimensional condition test
-     if logic_or(logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), $found_cloud_vendor == "VMware"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
-#       call err_utilities.log(join(["found a valid price_hash for ", $found_cloud_vendor]), to_s($price_hash))
+#     if logic_or(logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), $found_cloud_vendor == "VMware"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
+    ### TODO support VMware
+    if logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
 
        $purchase_options = keys($price_hash["purchase_option"])
          
@@ -661,7 +732,8 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
        $memory = to_n($price_hash["priceable_resource"]["memory"])
        if $memory >= to_n($ram_count)
          # then it's a contender
-       
+         # call err_utilities.log(join(["found a contender price_hash for ", $found_cloud_vendor]), to_s($price_hash))
+
            # There may be more than one usage_charge elements in the returned array. So find one that is NOT an option since this is the base price we'll be using
            $price = ""
            foreach $usage_charge in $price_hash["usage_charges"] do
@@ -671,13 +743,22 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
            
            # Is it cheapest so far?
            if to_n($price) < $cloud_costs_hash[$found_cloud_vendor]["price"]
+
+             if ($found_cloud_vendor == "Microsoft Azure")
+                $instance_type_name = $price_hash["priceable_resource"]["name"]
+                $instance_type_name = gsub($instance_type_name, " ", "_")
+                if !($instance_type_name =~ /^Basic/)
+                  $instance_type_name = "Standard_"+$instance_type_name
+                end
+                $price_hash["priceable_resource"]["name"] = $instance_type_name
+             end
              
              # Even if it's cheaper, make sure it's a supported instance type 
              call checkInstanceType($price_hash["purchase_option"]["cloud_href"], $price_hash["priceable_resource"]["name"], $supported_instance_types_hash) retrieve $supported_instance_types_hash, $usableInstanceType
              if $usableInstanceType # the pricing API returned an instance type that is supported for the account
-             
                $cloud_best_price = to_n($price)
                $cloud_href = $price_hash["purchase_option"]["cloud_href"]
+
                $instance_type = $price_hash["priceable_resource"]["name"]
                @cloud = rs_cm.clouds.get(href: $cloud_href)
                $instance_type_href = @cloud.instance_types(filter: [join(["name==",$instance_type])]).href
@@ -694,13 +775,14 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
                  "cloud_href": $cloud_href,
                  "instance_type": $instance_type,
                  "instance_type_href": $instance_type_href,
+                 "datacenter_name" : $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"], # carry the datacenter_name in case there's another hit for this cloud vendor
                  "datacenter_href": $datacenter_href
                }
                $cloud_costs_hash[$found_cloud_vendor] = $cloud_info
              end # usable instance type check
            end # price comparison
        end # RAM check
-     end # EBS-backed instance type test
+    end # EBS-backed instance type test
    end # price_hash loop
 end
 
@@ -722,14 +804,14 @@ define calc_app_cost(@web_tier) return $app_cost do
     end
   end
   
-  if $instance_cost  # Then we have instance cost informatin and so can calculate application cost
+  if $instance_cost  # Then we have instance cost information and so can calculate application cost
     # see how many web server instances there are
     @web_servers = select(@web_tier.current_instances(), {"state":"/^(operational|stranded)/"})
     $num_web_servers = size(@web_servers)
     # Ruby floating point arithmetic can cause strange results. Google it.
     # So to deal with it, we turn everything into an integer when doing the multiplications and then bring it back down to dollars and cents at the end.
     # We multiply/divide by 1000 to account for some of the pricing out there that goes to half-cents.
-    $calculated_app_cost = (($num_web_servers + 2) * ($instance_cost * 1000))/1000  
+    $calculated_app_cost = (($num_web_servers + 3) * ($instance_cost * 1000))/1000  
     $app_cost = to_s($calculated_app_cost)
   end
   
@@ -746,7 +828,7 @@ define checkInstanceType($cloud_href, $instance_type, $supported_instance_types_
     $instance_type_names=@instance_types.name[]
     $supported_instance_types_hash[$cloud_href] = $instance_type_names
     
-#    call err_utilities.log(join(["Gathered instance types for cloud, ", $cloud_href]), to_s($instance_type_names))
+    #call err_utilities.log("Gathered instance types for cloud, "+@cloud.name+", cloud_href: "+$cloud_href, to_s($instance_type_names))
   end
   
   # Check if the instance type found in the pricing API is a supported instance type

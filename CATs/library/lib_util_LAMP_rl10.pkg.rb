@@ -72,6 +72,10 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
       $webtier_hash["fields"]["image_href"] = $image_href
       $db_hash["fields"]["image_href"] = $image_href
     end
+  elsif $invSphere # need to change the chef server to use its private IP for the chef URL
+    call functions.log("Tweaking chef_hash for VMware - before tweak", to_s($chef_hash))
+    $chef_hash["fields"]["inputs"]["CHEF_SERVER_FQDN"] = "env:PRIVATE_IP"
+    call functions.log("Tweaking chef_hash for VMware - after tweak", to_s($chef_hash))
   end
 
   ##############################################################################
@@ -96,9 +100,15 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
   # /CHEF SERVER
   ##############################################################################
 
-  $lb_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',@chef_server.current_instance().public_ip_addresses[0],'/organizations/pft'])
-  $webtier_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',@chef_server.current_instance().public_ip_addresses[0],'/organizations/pft'])
-  $db_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',@chef_server.current_instance().public_ip_addresses[0],'/organizations/pft'])
+  # The Chef Server access is via it's private IP if in VMware
+  $chef_server_ip = @chef_server.current_instance().public_ip_addresses[0]
+  if $invSphere
+    $chef_server_ip = @chef_server.current_instance().private_ip_addresses[0]
+  end
+  
+  $lb_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',$chef_server_ip,'/organizations/pft'])
+  $webtier_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',$chef_server_ip,'/organizations/pft'])
+  $db_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',$chef_server_ip,'/organizations/pft'])
 
   @lb_server = $lb_hash
   @app_server = $webtier_hash
