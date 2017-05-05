@@ -72,13 +72,13 @@ RightScripts:
   - PFT_DB_Config
   - PHP_Appserver_Application_Backend-chef
   Decommission:
+  - PHP_Appserver_Application_Backend_Detach-chef
   - Name: RL10 Linux Shutdown Reason
     Revision: 5
     Publisher: RightScale
   - Name: Chef Client Delete Node
     Revision: 5
     Publisher: RS Professional Services
-  - PHP_Appserver_Application_Backend_Detach-chef
   Operational:
   - PHP_Appserver_Application_Backend-chef
   - PHP_Appserver_Application_Backend_Detach-chef
