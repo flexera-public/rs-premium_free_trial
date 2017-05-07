@@ -201,6 +201,11 @@ define install_appcode($param_appcode, @app_server) do
   @@deployment.multi_update_inputs(inputs: $inp)
   @app_server.next_instance().multi_update_inputs(inputs: $inp)
   @app_server.current_instances().multi_update_inputs(inputs: $inp)
+  
+  # Update app code
+  call server_templates_utilities.run_script_no_inputs(@app_server, "PHP Appserver Install - chef") 
+  # Reconnect to DB
+  call server_templates_utilities.run_script_no_inputs(@app_server, "PFT DB Config") 
 
   # Call the operational recipe to apply the new code
   #call server_templates_utilities.run_recipe_no_inputs(@app_server, "rs-application_php::default")
