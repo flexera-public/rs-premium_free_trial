@@ -34,7 +34,7 @@ define run_script_no_inputs(@target, $script_name) do
   call get_instance_collection(@target) retrieve @target_instances
 
   @task = @target_instances.run_executable(right_script_href: $right_script_href)
-  sleep_until(@task.summary =~ "^(Completed|Failed)")
+  sleep_until(@task.summary =~ "^(Completed|Failed|Aborted)")
   if @task.summary =~ "Failed"
     raise "Failed to run " + $script_name + " on server, " + @target.href
   end
@@ -48,7 +48,7 @@ define run_script_inputs(@target, $script_name, $script_inputs) do
   call get_instance_collection(@target) retrieve @target_instances
 
   @task = @target_instances.run_executable(right_script_href: $right_script_href, inputs: $script_inputs)
-  sleep_until(@task.summary =~ "^(Completed|Failed)")
+  sleep_until(@task.summary =~ "^(Completed|Failed|Aborted)")
   if @task.summary =~ "Failed"
     raise "Failed to run " + $script_name + " on server, " + @target.href
   end
