@@ -425,19 +425,19 @@ operation "update_app_code" do
   definition "lamp_utilities.install_appcode"
 end
 
-operation "scale_out" do
+operation "scale_out_app" do
   label "Scale Out"
   description "Adds (scales out) an application tier server."
-  definition "server_array_utilities.scale_out_array"
+  definition "scale_out"
   output_mappings do {
     $hourly_app_cost => $app_cost
   } end
 end
 
-operation "scale_in" do
+operation "scale_in_app" do
   label "Scale In"
   description "Scales in an application tier server."
-  definition "server_array_utilities.scale_in_array"
+  definition "scale_in"
   output_mappings do {
     $hourly_app_cost => $app_cost
   } end
@@ -785,6 +785,18 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
     end # EBS-backed instance type test
    end # price_hash loop
 end
+
+
+define scale_out(@app_server, @lb_server) return $app_cost do
+ call server_array_utilities.scale_out_array(@app_server, @lb_server)
+ call calc_app_cost(@app_server) retrieve $app_cost
+end
+
+define scale_in(@app_server) return $app_cost do
+ call server_array_utilities.scale_in_array(@app_server)
+ call calc_app_cost(@app_server) retrieve $app_cost
+end
+
 
 # Calculate the application cost
 define calc_app_cost(@web_tier) return $app_cost do
