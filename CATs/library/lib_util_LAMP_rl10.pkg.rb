@@ -207,11 +207,5 @@ define install_appcode($param_appcode, @app_server) do
   # Reconnect to DB
   call server_templates_utilities.run_script_no_inputs(@app_server, "PFT DB Config") 
 
-  # Call the operational recipe to apply the new code
-  #call server_templates_utilities.run_recipe_no_inputs(@app_server, "rs-application_php::default")
-  # TODO: This needs to be thought through. I could just run "PHP Appserver Install - chef" but
-  # idempotency might mean that nothing happens. May need to delete the deploy dir first, or
-  # just run a custom script to override the contents of the applicatoin deploy dir.
-  #call server_templates_utilities.run_script_no_inputs(@lb_server, "HAProxy Frontend - chef")
 
 end
