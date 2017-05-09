@@ -31,7 +31,7 @@ mapping "map_cloud" do {
     "cloud" => "AzureRM Australia East",
     "zone" => null,
     "instance_type" => "D1",
-    "sg" =>  "@sec_group",
+    "sg" =>  null, # security groups are supported but not required "@sec_group",
     "ssh_key" => null,
     "pg" => null,
     "network" => "pft_arm_network",
