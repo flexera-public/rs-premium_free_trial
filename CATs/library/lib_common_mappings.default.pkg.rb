@@ -31,7 +31,7 @@ mapping "map_cloud" do {
     "cloud" => "AzureRM East US",
     "zone" => null,
     "instance_type" => "D1",
-    "sg" =>  "@sec_group", 
+    "sg" =>  null, # secgroups are nice but not requried in ARM
     "ssh_key" => null,
     "pg" => null,
     "network" => "pft_arm_network",
