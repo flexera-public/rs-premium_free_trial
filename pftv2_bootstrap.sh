@@ -190,7 +190,12 @@ then
     then
         echo "No AzureV2 clouds, the network management CAT will not be executed"
     else
-        management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Network Setup"
+        if [[ "$options" != *"management_no_network"* ]]
+        then
+            management_cat_launch_wait_terminate_delete "PFT Admin CAT - PFT Network Setup"
+        else
+            echo "Skipping PFT Network Setup"
+        fi
     fi
 
     # Setup STs
