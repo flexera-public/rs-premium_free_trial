@@ -26,7 +26,7 @@ if [ -z "`which berkshelf`"]; then
   apt-get update
   apt-get install -y ruby2.2 ruby2.2-dev
 
-  gem2.2 install berkshelf
+  gem2.2 install berkshelf -v 5.6.5
 fi
 
 cd /tmp
