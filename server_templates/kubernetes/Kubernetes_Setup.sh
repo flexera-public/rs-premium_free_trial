@@ -47,9 +47,6 @@ IFS=$'\n\t'
 # Attachments:
 # - rs_cluster.sh
 # - rs_kubernetes.sh
-# - kube_flannel.yml
-# - kube_dashboard.yml
-# - kube_influxdb.yml
 # ...
 
 # shellcheck source=attachments/rs_cluster.sh

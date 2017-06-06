@@ -284,7 +284,7 @@ operation 'launch' do
   output_mappings do {
     $master_ip => $new_master_ip,
     $admin_ips => $new_admin_ips,
-    $dashboard_url => join(["http://", $new_master_ip, ":", $dashboard_port])
+    $dashboard_url => join(["http://", $new_master_ip, ":8001/ui"])
   } end
 end
 
@@ -321,7 +321,7 @@ end
 # DEFINITIONS (i.e. RCL) #
 ##########################
 
-define launch(@cluster_master, @cluster_node, @cluster_sg, @cluster_sg_rule_admin, @cluster_sg_rule_int_tcp, @cluster_sg_rule_int_udp, $admin_ip, $cloud) return @cluster_master, @cluster_node, @cluster_sg, @cluster_sg_rule_admin, @cluster_sg_rule_int_tcp, @cluster_sg_rule_int_udp, $new_master_ip, $new_admin_ips, $dashboard_port do
+define launch(@cluster_master, @cluster_node, @cluster_sg, @cluster_sg_rule_admin, @cluster_sg_rule_int_tcp, @cluster_sg_rule_int_udp, $admin_ip, $cloud) return @cluster_master, @cluster_node, @cluster_sg, @cluster_sg_rule_admin, @cluster_sg_rule_int_tcp, @cluster_sg_rule_int_udp, $new_master_ip, $new_admin_ips do
 
   task_label("Setting cluster parameters")
 
@@ -360,9 +360,9 @@ define launch(@cluster_master, @cluster_node, @cluster_sg, @cluster_sg_rule_admi
   task_label("Launching master server")
 
   provision(@cluster_master)
-  
+
   @@deployment.multi_update_inputs(inputs: {
-    'KUBE_CLUSTER_JOIN_CMD': 'cred:' + 'KUBE_' + $execution_id + '_CLUSTER_TOKEN'
+    'KUBE_CLUSTER_JOIN_CMD': 'cred:' + 'KUBE_' + $execution_id + '_JOIN_CMD'
   })
 
   task_label("Launching node servers")
@@ -372,7 +372,6 @@ define launch(@cluster_master, @cluster_node, @cluster_sg, @cluster_sg_rule_admi
   task_label("Finalizing cluster parameters")
 
   $new_admin_ips = $admin_ip
-  $dashboard_port = tag_value(first(@cluster_master.current_instances()), "rs_cluster:dashboard_port")
 
   if $cloud == "AWS"
     $new_master_ip = @cluster_master.current_instances().public_ip_addresses[0]
@@ -390,8 +389,9 @@ define terminate(@cluster_master, @cluster_node) return @cluster_master, @cluste
     delete(@cluster_node)
   end
   
+  task_label("Removing cluster credentials")
   call kube_get_execution_id() retrieve $execution_id
-  $credential_name = "KUBE_" + $execution_id + "_CLUSTER_TOKEN"
+  $credential_name = "KUBE_" + $execution_id + "_JOIN_CMD"
   @credential = find("credentials", $credential_name)
   @credential.destroy()
 end
@@ -431,7 +431,7 @@ define add_admin_ip(@cluster_sg, $admin_ip) return $new_admin_ips do
   provision(@new_rule)
 
   task_label("Updating cluster parameters")
-  
+
   @ingress_rules = select(@cluster_sg.security_group_rules(), { direction: "ingress" })
 
   $sg_ips = map $sg_cidr_ip in @ingress_rules.cidr_ips[] return $sg_ip do
