@@ -614,40 +614,30 @@ end
 # Calculate the cost of using the different clouds found in the $map_cloud mapping
 define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_hash do
   
-  $cloud_costs_hash = {}
   $supported_instance_types_hash = {}
   # Seed the cloud info
-  $cloud_info = {
-    "price": 10000,
-    "cloud_name": "",
-    "cloud_href": "",
-    "instance_type": "",
-    "instance_type_href": "",
-    "datacenter_name": "",
-    "datacenter_href": ""
-  }
-  $cloud_href_filter = []
-  $cloud_provider_filter = []
-  foreach $cloud in keys($map_cloud) do
-    
-    $cloud_vendor_name = map($map_cloud, $cloud, "cloud_provider")
 
-    # Seed the cloud hash 
-    $cloud_costs_hash[$cloud_vendor_name] = $cloud_info
-    # add in the datacenter_name if it's in the cloud mapping
-    $cloud_costs_hash[$cloud_vendor_name]["datacenter_name"] = map($map_cloud, $cloud, "zone")
- 
-    # Build a cloud provider filter for the api call below.
-    # No longer needed since we build a filter of clouds/regions.
-#      $cloud_provider_filter << $cloud_vendor_name
+  # Build up a list of cloud hrefs for the pricing filter below
+  # We'll only look at clouds that the MCI supports.
+
+    $cloud_provider_filter = []
+      
+
+   
+      # Build a cloud provider filter for the api call below.
+      # No longer needed since we build a filter of clouds/regions.
+  #      $cloud_provider_filter << $cloud_vendor_name
+      
+#  
+#      $cloud_href_array = rs_cm.clouds.get(filter: [ join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")]) ]).href[]
+#        
+#        
+#      $cloud_href_filter = $cloud_href_filter + $cloud_href_array
     
-    # Build up a list of cloud hrefs for the pricing filter below
-    $cloud_href_array = rs_cm.clouds.get(filter: [ join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")]) ]).href[]
-    $cloud_href_filter = $cloud_href_filter + $cloud_href_array
-  end
-  
+   
   ### FOR TESTING - LIMIT TO ONE CLOUD FOR TESTING: cloud type: azure_v2, google, amazon
 #  $cloud_href_filter = rs_cm.clouds.get(filter: [ "cloud_type==amazon" ]).href[]
+  $cloud_href_filter = ["/api/clouds/1","/api/clouds/2","/api/clouds/3","/api/clouds/4","/api/clouds/5","/api/clouds/6","/api/clouds/7","/api/clouds/8","/api/clouds/9","/api/clouds/3518","/api/clouds/3519","/api/clouds/3520","/api/clouds/3521","/api/clouds/3522","/api/clouds/3523","/api/clouds/3524","/api/clouds/3525","/api/clouds/3526","/api/clouds/3527","/api/clouds/3528","/api/clouds/3529","/api/clouds/3530","/api/clouds/3531","/api/clouds/3532","/api/clouds/2175","/api/clouds/3482"]
 
   call err_utilities.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
 
@@ -689,10 +679,29 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
      
    call err_utilities.log(join(["price_hash_array size: ", size($price_hash_array)]), "")
      
-   # Now we need to find the best pricing info for the vanilla Linux/Unix platform
-   # with the minimum cpu and ram for the given cloud
-   $cloud_best_price = 100000
-   foreach $price_hash in $price_hash_array do
+  # Build a blank cloud costs hash that will filled up as we go through the options.
+  $cloud_costs_hash = {}
+  $cloud_info = {
+    "price": 10000,
+    "cloud_name": "",
+    "cloud_href": "",
+    "instance_type": "",
+    "instance_type_href": "",
+    "datacenter_name": "",
+    "datacenter_href": ""
+  }
+  foreach $cloud in keys($map_cloud) do
+    $cloud_vendor_name = map($map_cloud, $cloud, "cloud_provider")
+    # Seed the cloud hash 
+    $cloud_costs_hash[$cloud_vendor_name] = $cloud_info
+    # add in the datacenter_name if it's in the cloud mapping
+    $cloud_costs_hash[$cloud_vendor_name]["datacenter_name"] = map($map_cloud, $cloud, "zone")
+  end
+     
+  # Now we need to find the best pricing info for the vanilla Linux/Unix platform
+  # with the minimum cpu and ram for the given cloud
+  $cloud_best_price = 100000
+  foreach $price_hash in $price_hash_array do
      
    # Need to figure out which cloud vendor we have here
    if contains?(keys($price_hash["priceable_resource"]), ["public_cloud_vendor_name"])
@@ -732,7 +741,7 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
        $memory = to_n($price_hash["priceable_resource"]["memory"])
        if $memory >= to_n($ram_count)
          # then it's a contender
-         # call err_utilities.log(join(["found a contender price_hash for ", $found_cloud_vendor]), to_s($price_hash))
+#          call err_utilities.log(join(["found a contender price_hash for ", $found_cloud_vendor]), to_s($price_hash))
 
            # There may be more than one usage_charge elements in the returned array. So find one that is NOT an option since this is the base price we'll be using
            $price = ""
