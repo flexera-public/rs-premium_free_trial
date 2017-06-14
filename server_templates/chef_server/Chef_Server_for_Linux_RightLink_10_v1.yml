@@ -57,7 +57,10 @@ RightScripts:
     Revision: 4
   - Name: RL10 Chef Server Install
     Publisher: RS Professional Services
-    Revision: 9
+    Revision: 12
+  - Name: RL10 Chef Server Schedule Cron For Backups Via RightScripts
+    Publisher: RS Professional Services
+    Revision: 1
   - PFT_RL10_Chef_Create_Admin_User.sh
   - PFT_RL10_Chef_Create_Org.sh
   - PFT_RL10_Chef_Validator_Pem_to_Tag.sh
@@ -70,13 +73,19 @@ RightScripts:
   Operational:
   - Name: RL10 Chef Server Backup
     Publisher: RS Professional Services
-    Revision: 4
+    Revision: 5
   - Name: RL10 Chef Server Restore
     Publisher: RS Professional Services
-    Revision: 4
-  - Name: RL10 Chef Server Schedule Backup
+    Revision: 5
+  - Name: RL 10 CHEF SERVER BACKUP VIA RIGHTSCRIPTS
     Publisher: RS Professional Services
     Revision: 2
+  - Name: RL 10 CHEF SERVER RESTORE VIA RIGHTSCRIPTS
+    Publisher: RS Professional Services
+    Revision: 2
+  - Name: RL10 Chef Server Install
+    Publisher: RS Professional Services
+    Revision: 12
   - Name: RL10 Linux Setup Automatic Upgrade
     Publisher: RightScale
     Revision: 4
