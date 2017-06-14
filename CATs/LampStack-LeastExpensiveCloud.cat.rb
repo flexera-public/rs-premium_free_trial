@@ -451,7 +451,7 @@ define launch_servers(@chef_server, @lb_server, @app_server, @db_server, @ssh_ke
   # Calculate where to launch the system
 
   # Use the pricing API to get some numbers
-  call find_cloud_costs($map_cloud, $param_cpu, $param_ram) retrieve $cloud_costs_hash
+  call find_cloud_costs($map_cloud, $map_mci, $param_cpu, $param_ram) retrieve $cloud_costs_hash
   
   call err_utilities.log("cloud costs hash", to_s($cloud_costs_hash))
   
@@ -612,35 +612,41 @@ end
 
 
 # Calculate the cost of using the different clouds found in the $map_cloud mapping
-define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_hash do
+define find_cloud_costs($map_cloud, $map_mci, $cpu_count, $ram_count) return $cloud_costs_hash do
   
   $supported_instance_types_hash = {}
-  # Seed the cloud info
 
   # Build up a list of cloud hrefs for the pricing filter below
-  # We'll only look at clouds that the MCI supports.
+  # We'll only look at clouds that the MCI supports and are of a type in the map_cloud
+  $mci_name = map($map_mci, "Public", "mci_name")
+  $mci_rev = map($map_mci, "Public", "mci_rev")
+  $cloud_keys = keys($map_cloud)
+  $acceptable_cloud_types = []
+  foreach $cloud_key in $cloud_keys do
+    $acceptable_cloud_types << map($map_cloud, $cloud_key, "cloud_type")
+  end
+  
+  call err_utilities.log("Building cloud list.", "")
 
-    $cloud_provider_filter = []
-      
-
-   
-      # Build a cloud provider filter for the api call below.
-      # No longer needed since we build a filter of clouds/regions.
-  #      $cloud_provider_filter << $cloud_vendor_name
-      
-#  
-#      $cloud_href_array = rs_cm.clouds.get(filter: [ join(["cloud_type==",map($map_cloud, $cloud, "cloud_type")]) ]).href[]
-#        
-#        
-#      $cloud_href_filter = $cloud_href_filter + $cloud_href_array
-    
+  @mci = find("multi_cloud_images", $mci_name, $mci_rev)
+  @mci_settings = @mci.settings()
+  $cloud_href_filter = []
+  foreach @setting in @mci_settings do
+    sub on_error: skip do  # There may be cloud() links in the collection that are undefined in the account.
+      $cloud_href = @setting.cloud().href
+      $cloud_type = @setting.cloud().cloud_type
+      if contains?($acceptable_cloud_types, [$cloud_type])
+        $cloud_href_filter << @setting.cloud().href 
+      end
+    end
+  end  
    
   ### FOR TESTING - LIMIT TO ONE CLOUD FOR TESTING: cloud type: azure_v2, google, amazon
 #  $cloud_href_filter = rs_cm.clouds.get(filter: [ "cloud_type==amazon" ]).href[]
-  $cloud_href_filter = ["/api/clouds/1","/api/clouds/2","/api/clouds/3","/api/clouds/4","/api/clouds/5","/api/clouds/6","/api/clouds/7","/api/clouds/8","/api/clouds/9","/api/clouds/3518","/api/clouds/3519","/api/clouds/3520","/api/clouds/3521","/api/clouds/3522","/api/clouds/3523","/api/clouds/3524","/api/clouds/3525","/api/clouds/3526","/api/clouds/3527","/api/clouds/3528","/api/clouds/3529","/api/clouds/3530","/api/clouds/3531","/api/clouds/3532","/api/clouds/2175","/api/clouds/3482"]
+#  $cloud_href_filter = ["/api/clouds/1","/api/clouds/2","/api/clouds/3","/api/clouds/4","/api/clouds/5","/api/clouds/6","/api/clouds/7","/api/clouds/8","/api/clouds/9","/api/clouds/3518","/api/clouds/3519","/api/clouds/3520","/api/clouds/3521","/api/clouds/3522","/api/clouds/3523","/api/clouds/3524","/api/clouds/3525","/api/clouds/3526","/api/clouds/3527","/api/clouds/3528","/api/clouds/3529","/api/clouds/3530","/api/clouds/3531","/api/clouds/3532","/api/clouds/2175","/api/clouds/3482"]
 
-  call err_utilities.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
-
+  call err_utilities.log(join(["cloud_href_filter: "]), to_s($cloud_href_filter))
+  
    # Build an array of cpu counts for the pricing API filter
    # If the 1 CPU option was selected, also look at 2 CPUs since pricing can be a bit mushy in that range and a 2 CPU 
    # instance type in some clouds may be chepaer than a 1 CPU option in other clouds.
@@ -651,7 +657,6 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
 
    # pricing filters
    $filter = {
-#     public_cloud_vendor_name: $cloud_provider_filter,  
      cloud_href: $cloud_href_filter,
      cpu_count: $cpu_count_array,
      account_href: [null],  # this returns the standard on-demand pricing
@@ -697,7 +702,9 @@ define find_cloud_costs($map_cloud, $cpu_count, $ram_count) return $cloud_costs_
     # add in the datacenter_name if it's in the cloud mapping
     $cloud_costs_hash[$cloud_vendor_name]["datacenter_name"] = map($map_cloud, $cloud, "zone")
   end
-     
+  
+  call err_utilities.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
+
   # Now we need to find the best pricing info for the vanilla Linux/Unix platform
   # with the minimum cpu and ram for the given cloud
   $cloud_best_price = 100000
