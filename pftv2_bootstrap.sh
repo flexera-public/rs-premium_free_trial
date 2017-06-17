@@ -93,7 +93,7 @@ fi
 if [[ "$options" == *"all"* || "$options" == *"sts"* ]]
 then
   echo "Checking for Chef Server Template. This is a prerequsite to importing the ServerTemplates."
-  chef_server_response=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index server_templates "filter[]=name==Chef Server for Linux (RightLink 10)" "filter[]=revision==17")
+  chef_server_response=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 index server_templates "filter[]=name==Chef Server for Linux (RightLink 10)" "filter[]=revision==18")
   if [[ -z "$chef_server_response" ]]
   then
     echo "We need you to complete one manual step first. Go import the Chef Server for Linux (RightLink 10) and accept the EULA. Here's a handy link - http://www.rightscale.com/library/server_templates/Chef-Server-for-Linux-RightLin/lineage/57238"

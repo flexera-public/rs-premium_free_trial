@@ -85,7 +85,7 @@ RightScripts:
     Revision: 2
   - Name: RL10 Chef Server Install
     Publisher: RS Professional Services
-    Revision: 12
+    Revision: 13
   - Name: RL10 Linux Setup Automatic Upgrade
     Publisher: RightScale
     Revision: 4
