@@ -201,7 +201,7 @@ resource 'rancher_server', type: 'server' do
   name 'Rancher Server'
   cloud map( $map_cloud, $param_location, "cloud" )
   datacenter map($map_cloud, $param_location, "zone")
-  instance_type "t2.medium"
+  instance_type map($map_cloud, $param_location, "instance_type")
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
   security_group_hrefs map($map_cloud, $param_location, "sg") 
@@ -221,7 +221,7 @@ resource 'rancher_host', type: 'server_array' do
   name 'Rancher Host'
   cloud map( $map_cloud, $param_location, "cloud" )
   datacenter map($map_cloud, $param_location, "zone")
-#  instance_type map($map_cloud, $param_location, "instance_type")
+  instance_type map($map_cloud, $param_location, "instance_type")
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
   security_group_hrefs map($map_cloud, $param_location, "sg") 
