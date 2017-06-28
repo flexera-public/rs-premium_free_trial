@@ -680,18 +680,20 @@ define get_current_app_lists() return $app_names, $app_links, $app_graphs, $app_
    $app_links = [["placeholder"]]
    $app_graphs = [["placeholder"]]
    $app_codes = [["placeholder"]]
-   foreach $output in $outputs do 
-     $output_value = $output["value"]["value"]
-     if $output_value != ""
-       $output_name = $output["name"]
-       if $output_name =~ /app_[0-9]+_name/
-         $app_names << [$output_value]
-       elsif $output_name =~ /app_[0-9]+_link/
-         $app_links << [$output_value]
-       elsif $output_name =~ /app_[0-9]+_graph/
-         $app_graphs << [$output_value]
-       elsif $output_name =~ /app_[0-9]+_code/
-         $app_codes << [$output_value]
+   foreach $output in $outputs do
+     if $output["value"] != null
+       $output_value = $output["value"]["value"]
+       if $output_value != ""
+         $output_name = $output["name"]
+         if $output_name =~ /app_[0-9]+_name/
+           $app_names << [$output_value]
+         elsif $output_name =~ /app_[0-9]+_link/
+           $app_links << [$output_value]
+         elsif $output_name =~ /app_[0-9]+_graph/
+           $app_graphs << [$output_value]
+         elsif $output_name =~ /app_[0-9]+_code/
+           $app_codes << [$output_value]
+         end
        end
      end
    end
