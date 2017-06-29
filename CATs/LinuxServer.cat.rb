@@ -31,6 +31,7 @@ Clouds Supported: <B>AWS, Azure Classic, AzureRM, Google, VMware</B>"
 import "pft/parameters"
 import "pft/mappings"
 import "pft/resources", as: "common_resources"
+import "pft/linux_server_declarations"
 import "pft/conditions"
 import "pft/cloud_utilities", as: "cloud"
 import "pft/account_utilities", as: "account"
@@ -99,16 +100,9 @@ mapping "map_instancetype" do
   like $mappings.map_instancetype
 end
 
-mapping "map_config" do {
-  "st" => {
-    "name" => "PFT Base Linux ServerTemplate",
-    "rev" => "0",
-  },
-  "mci" => {
-    "name" => "PFT Base Linux MCI",
-    "rev" => "0",
-  },
-} end
+mapping "map_config" do 
+  like $linux_server_declarations.map_config
+end
 
 
 ############################
@@ -117,17 +111,7 @@ mapping "map_config" do {
 
 ### Server Definition ###
 resource "linux_server", type: "server", copies: $param_numservers do
-  name join(['Linux Server-',last(split(@@deployment.href,"/")), "-", copy_index()])
-  cloud map($map_cloud, $param_location, "cloud")
-  datacenter map($map_cloud, $param_location, "zone")
-  network find(map($map_cloud, $param_location, "network"))
-  subnets find(map($map_cloud, $param_location, "subnet"))
-  instance_type map($map_instancetype, $param_instancetype, $param_location)
-  ssh_key_href map($map_cloud, $param_location, "ssh_key")
-  placement_group_href map($map_cloud, $param_location, "pg")
-  security_group_hrefs map($map_cloud, $param_location, "sg")  
-  server_template_href find(map($map_config, "st", "name"), revision: map($map_config, "st", "rev"))
-  multi_cloud_image_href find(map($map_config, "mci", "name"), revision: map($map_config, "mci", "rev"))
+  like @linux_server_declarations.linux_server
 end
 
 ### Security Group Definitions ###
