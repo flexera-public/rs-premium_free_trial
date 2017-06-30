@@ -590,9 +590,7 @@ define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return 
   # with the minimum cpu and ram for the given cloud
   $cloud_best_price = 100000
   foreach $price_hash in $price_hash_array do
-     
-#    $$TIMESTAMPS["begin_processing_price_hash"] = now()
-      
+           
    # Need to figure out which cloud vendor we have here
    if contains?(keys($price_hash["priceable_resource"]), ["public_cloud_vendor_name"])
       $found_cloud_vendor = $price_hash["priceable_resource"]["public_cloud_vendor_name"]
@@ -612,9 +610,6 @@ define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return 
        $found_cloud_vendor = "VMware"
      end
    end
-   
-#    $$TIMESTAMPS["id_cloud_vendor"] = now()
-
          
 #     call err_utilities,log(join(["found vendor: ", $found_cloud_vendor]), "")
 
@@ -626,16 +621,12 @@ define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return 
 #     if logic_or(logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), $found_cloud_vendor == "VMware"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
     if logic_or(logic_or(logic_or($found_cloud_vendor == "Google", $found_cloud_vendor == "Microsoft Azure"), $found_cloud_vendor == "VMware"), logic_and($found_cloud_vendor == "Amazon Web Services", to_s($price_hash["priceable_resource"]["local_disk_size"]) != "0.0"))
       
-#      $$TIMESTAMPS["begin_found_vendor"] = now()
-
        $purchase_options = keys($price_hash["purchase_option"])
          
        # Check the RAM offering for the given instance type to make sure it meets the minimum required by the user
        # Although there is a memory filter in the pricing API, this is easier than guessing what possible memory configs are available by the differen cloud providers.
        $memory = to_n($price_hash["priceable_resource"]["memory"])
        if $memory >= to_n($ram_count)
-#         $$TIMESTAMPS["contender"] = now()
-
          # then it's a contender
 #          call err_utilities.log(join(["found a contender price_hash for ", $found_cloud_vendor]), to_s($price_hash))
 
@@ -659,42 +650,26 @@ define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return 
              end
              
              # Even if it's cheaper, make sure it's a supported instance type 
-#         $$TIMESTAMPS["before_check_instancetype"] = now()
-
              call checkInstanceType($price_hash["purchase_option"]["cloud_href"], $price_hash["priceable_resource"]["name"], $supported_instance_types_hash) retrieve $supported_instance_types_hash, $usableInstanceType
-#         $$TIMESTAMPS["after_check_instancetype"] = now()
 
               if $usableInstanceType # the pricing API returned an instance type that is supported for the account
                $cloud_best_price = to_n($price)
                $cloud_href = $price_hash["purchase_option"]["cloud_href"]
                $datacenter_name = ""
                $instance_type = $price_hash["priceable_resource"]["name"]
-#               @cloud = rs_cm.clouds.get(href: $cloud_href)
-#               $instance_type_href = "foo" #@cloud.instance_types(filter: [join(["name==",$instance_type])]).href
                if contains?($purchase_options, ["datacenter_name"])  # then set the datacenter with that provided in the pricing info
                   $datacenter_name = $price_hash["purchase_option"]["datacenter_name"]
-#                  $datacenter_href = @cloud.datacenters(filter: [join(["name==",$datacenter_name])]).href
                elsif $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"]  # then use the datacenter we set in the cloud map - only really needed for VMware env
                   $datacenter_name = $cloud_costs_hash[$found_cloud_vendor]["datacenter_name"]
-#                  $datacenter_href = @cloud.datacenters(filter: [join(["name==",$datacenter_name])]).href
                end
                $cloud_info = {
                  "price": $cloud_best_price,
-#                 "cloud_name": @cloud.name,
                  "cloud_href": $cloud_href,
                  "instance_type": $instance_type,
-#                 "instance_type_href": $instance_type_href,
                  "datacenter_name" : $datacenter_name #$cloud_costs_hash[$found_cloud_vendor]["datacenter_name"] # carry the datacenter_name in case there's another hit for this cloud vendor
-#                 "datacenter_href": $datacenter_href
                }
                $cloud_costs_hash[$found_cloud_vendor] = $cloud_info
                
-#               $$TIMESTAMPS["end_useable_check"] = now()
-                 
-#               call err_utilities.log("DEBUG: PRICEHASH TIMESTAMPS", to_s($$TIMESTAMPS))
-                 
-#               raise "TIME DEBUGGING: single price_hash"
-
              end # usable instance type check
            end # price comparison
        end # RAM check
