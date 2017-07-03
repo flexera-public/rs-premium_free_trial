@@ -331,14 +331,9 @@ define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, 
 
   # Calculate where to launch the system
   
-  $$TIMESTAMPS = {}
-
-  $$TIMESTAMPS["before_find_cloud_costs"] = now()
   # Use the pricing API to get some numbers
   call find_cloud_costs($map_cloud, $map_config, $param_cpu, $param_ram) retrieve $cloud_costs_hash
   
-  $$TIMESTAMPS["after_find_cloud_costs"] = now()
-
   call err_utilities.log("cloud costs hash", to_s($cloud_costs_hash))
       
   # Build the cloud cost outputs
@@ -388,8 +383,6 @@ define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, 
       
   call err_utilities.log(join(["param_location: ",$param_location]), "")
     
-  $$TIMESTAMPS["ready_to_modify_resources"] = now()
-
   # Finish configuring the resource declarations so they are ready for launch
       
   # modify resources with the cheapest cloud
@@ -446,9 +439,6 @@ define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, 
     call modify_resource_definition(@linux_server, $update_hash) retrieve @linux_server
   end
   
-$$TIMESTAMPS["ready_to_provision_server"] = now()
-
-  
 #  call err_utilities.log("chef_sever object hash", to_s(to_object(@chef_server)))
     
   # At this point we have the server declaration updated with the necessary values from the least expensive cloud search.
@@ -456,15 +446,7 @@ $$TIMESTAMPS["ready_to_provision_server"] = now()
   # So now we are ready to provision the servers. 
   provision(@linux_server)
   
-$$TIMESTAMPS["server_provisioned"] = now()
-
-  
   call calc_app_cost($param_numservers) retrieve $app_cost
-  
-$$TIMESTAMPS["app_cost_calcuated"] = now()
-
-call err_utilities.log("DEBUG: TIMESTAMPS", to_s($$TIMESTAMPS))
-
   
 end 
 
@@ -480,9 +462,7 @@ end
 
 # Calculate the cost of using the different clouds found in the $map_cloud mapping
 define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return $cloud_costs_hash do
-  
-  $$TIMESTAMPS["begin_find_cloud_costs"] = now()
-    
+      
   $supported_instance_types_hash = {}
 
   # Build up a list of cloud hrefs for the pricing filter below
@@ -508,14 +488,12 @@ define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return 
       end
     end
   end  
-
-  $$TIMESTAMPS["generated_cloud_href_filter"] = now()
-
+  
 #   
 #  ### FOR TESTING - LIMIT TO ONE CLOUD FOR TESTING: cloud type: azure_v2, google, amazon
 ##  $cloud_href_filter = rs_cm.clouds.get(filter: [ "cloud_type==amazon" ]).href[]
 ##  $cloud_href_filter = ["/api/clouds/1","/api/clouds/2","/api/clouds/3","/api/clouds/4","/api/clouds/5","/api/clouds/6","/api/clouds/7","/api/clouds/8","/api/clouds/9","/api/clouds/3518","/api/clouds/3519","/api/clouds/3520","/api/clouds/3521","/api/clouds/3522","/api/clouds/3523","/api/clouds/3524","/api/clouds/3525","/api/clouds/3526","/api/clouds/3527","/api/clouds/3528","/api/clouds/3529","/api/clouds/3530","/api/clouds/3531","/api/clouds/3532","/api/clouds/2175","/api/clouds/3482"]
-##  $cloud_href_filter = ["/api/clouds/3470"]
+## (VMware vs Azure):  $cloud_href_filter = ["/api/clouds/3470", "/api/clouds/3531"]
 #
   call err_utilities.log(join(["cloud_href_filter: "]), to_s($cloud_href_filter))  # t=3-6
   
@@ -539,8 +517,6 @@ define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return 
     }
       
    call err_utilities.log(join(["pricing filter: "]), to_s($filter))
-
-   $$TIMESTAMPS["before_pricing_api_call"] = now()
     
    # Get an array of price hashes for the given filters
    $response = http_request(
@@ -550,14 +526,13 @@ define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return 
      href: "/api/prices",
      headers: { "X_API_VERSION": "1.0", "Content-Type": "application/json" },
      query_strings: {
-       filter: to_json($filter) # For Praxis-based APIs (e.g. the pricing API) one needs to to_json() the query string values to avoid URL encoding of the null value in the filter.
+       filter: to_json($filter), # For Praxis-based APIs (e.g. the pricing API) one needs to to_json() the query string values to avoid URL encoding of the null value in the filter.
+       limit: 20000  # max allowed - we want to make sure we get all the prices we can
        }
      )
    
    $price_hash_array = $response["body"]
-
-   $$TIMESTAMPS["after_pricing_api_call"] = now()
-
+     
    call err_utilities.log(join(["price_hash_array size: ", size($price_hash_array)]), "") # t=5
      
   # Build a blank cloud costs hash that will filled up as we go through the options.
@@ -579,13 +554,8 @@ define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return 
     $cloud_costs_hash[$cloud_vendor_name]["datacenter_name"] = map($map_cloud, $cloud, "zone")
   end
   
-  $$TIMESTAMPS["after_seeding_cloud_costs_hash"] = now()
-
-  
   call err_utilities.log("seeded cloud_costs_hash:", to_s($cloud_costs_hash))
     
-  $$TIMESTAMPS["before_processing_price_hashes"] = now()
-
   # Now we need to find the best pricing info for the vanilla Linux/Unix platform
   # with the minimum cpu and ram for the given cloud
   $cloud_best_price = 100000
@@ -675,8 +645,6 @@ define find_cloud_costs($map_cloud, $map_config, $cpu_count, $ram_count) return 
        end # RAM check
     end # EBS-backed instance type test
    end # price_hash loop
-   
-   $$TIMESTAMPS["after_price_hash_loop"] = now()
 end # t=10
 
 # Calculate the application cost

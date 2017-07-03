@@ -8,7 +8,7 @@ import "pft/parameters"
 import "pft/mappings"
 
 resource "linux_server", type: "server", copies: $param_numservers do
-  name join(['linux-',last(split(@@deployment.href,"/"))]), "-", copy_index()])
+  name join(['linux-',last(split(@@deployment.href,"/")), "-", copy_index()])
   cloud map($map_cloud, $param_location, "cloud")
   datacenter map($map_cloud, $param_location, "zone")
   network find(map($map_cloud, $param_location, "network"))
