@@ -217,7 +217,15 @@ end
 
 # Import and set up what is needed for the server and then launch it.
 define pre_auto_launch($map_cloud, $param_location, $map_st) do
-    
+   
+  # Check the execution name against Azure naming rules
+  if ($param_location == "AzureRM")
+    call account_utilities.checkAzureName(@@execution.name) retrieve $check_result
+    if ($check_result)
+      raise "AzureRM Naming Violation: " + $check_result
+    end
+  end
+  
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
 

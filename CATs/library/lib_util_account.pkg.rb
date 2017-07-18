@@ -75,3 +75,17 @@ define getUserLogin() return $userlogin do
   @user = rs_cm.get(href: $user_id)
   $userlogin = @user.login_name
 end
+
+# Azure is fussy about names.
+# Specifically if the name has "Windows" in it, Azure rejects the request due to copyright issues.
+# Oh Microsoft.
+# This definition checks for verboten Azure names.
+# Currently the only one we know of is if "windows" is in there.
+# As others are discovered, this definition can be udpated.
+define checkAzureName($name) return $check_result do
+  $check_result = null
+  # check for "windows" 
+  if include?(downcase($name), "windows")
+    $check_result = "Name contains variant of string \"windows\""
+  end
+end
