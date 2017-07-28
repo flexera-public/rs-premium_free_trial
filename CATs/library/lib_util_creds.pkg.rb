@@ -17,6 +17,22 @@ define createCreds($credname_array) do
   end
 end
 
+# Deletes a CREDENTIALs listed in array
+define deleteCreds($credname_array) do
+  foreach $cred_name in $credname_array do
+    @creds = rs_cm.credentials.get(filter: [ join(["name==",$cred_name]) ])
+    if logic_not(empty?(@creds))
+      # loop through the one or more creds returned and check for exact name match
+      foreach @cred in @creds do
+        if (@cred.name == $cred_name)
+          # found the exact cred so delete it
+          @cred.destroy()
+        end
+      end
+    end
+  end
+end
+
 
 
 
