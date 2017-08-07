@@ -42,6 +42,9 @@ import "pft/server_array_utilities"
 import "pft/permissions"
 import "pft/err_utilities"
 import "pft/creds_utilities"
+import "pft/mci"
+import "pft/mci/linux_mappings", as: "linux_mappings"
+ 
  
 ##################
 # Permissions    #
@@ -243,6 +246,10 @@ mapping "map_config" do
   like $linux_server_declarations.map_config
 end
 
+mapping "map_image_name_root" do 
+ like $linux_mappings.map_image_name_root
+end
+
 mapping "map_nulls" do {
   "place_holder" => {
     "null_value" => null
@@ -327,7 +334,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @placement_group, $map_cloud, $map_config, $param_cpu, $param_ram, $param_costcenter, $param_numservers)  return @linux_server, @sec_group, @ssh_key, @placement_group, $param_location, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
+define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @placement_group, $map_cloud, $map_config, $map_image_name_root, $param_cpu, $param_ram, $param_costcenter, $param_numservers)  return @linux_server, @sec_group, @ssh_key, @placement_group, $param_location, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
 
   # Calculate where to launch the system
   
@@ -382,6 +389,14 @@ define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, 
   end
       
   call err_utilities.log(join(["param_location: ",$param_location]), "")
+    
+  # Make sure the MCI is pointing to the latest image for the cloud.
+  # This adds about a minute to the launch but is worth it to avoid a failure due to the cloud provider
+  # deprecating the image we use.
+  $mci_name = map($map_config, "mci", "name")
+  call mci.find_mci($mci_name) retrieve @mci
+  call mci.find_image_href(@cloud, $map_image_name_root, "PFT Base Linux", switch($param_location == "Azure", "AzureRM", $param_location)) retrieve $image_href
+  call mci.mci_upsert_cloud_image(@mci, @cloud.href, $image_href)
     
   # Finish configuring the resource declarations so they are ready for launch
       

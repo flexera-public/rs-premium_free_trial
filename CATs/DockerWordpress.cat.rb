@@ -48,6 +48,8 @@ import "pft/server_templates_utilities"
 import "pft/err_utilities"
 import "pft/cloud_utilities"
 import "pft/permissions"
+import "pft/mci"
+import "pft/mci/linux_mappings", as: "linux_mappings"
  
 ##################
 # Permissions    #
@@ -98,6 +100,10 @@ mapping "map_config" do {
     "rev" => "0",
   },
 } end
+
+mapping "map_image_name_root" do 
+ like $linux_mappings.map_image_name_root
+end
 
 ############################
 # RESOURCE DEFINITIONS     #
@@ -218,7 +224,7 @@ end
 
 # Import and set up what is needed for the server and then launch it.
 # The server template includes a docker compose input which automatically installs Wordpress
-define pre_auto_launch($map_cloud, $param_location) do
+define pre_auto_launch($map_cloud, $map_config, $map_image_name_root, $param_location) do
   
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
 
@@ -226,6 +232,16 @@ define pre_auto_launch($map_cloud, $param_location) do
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
   call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
+  
+  # Make sure the MCI is pointing to the latest image for the cloud.
+  # This adds about a minute to the launch but is worth it to avoid a failure due to the cloud provider
+  # deprecating the image we use.
+  $mci_name = map($map_config, "mci", "name")
+  call mci.find_mci($mci_name) retrieve @mci
+  @cloud = find("clouds", $cloud_name)
+  call mci.find_image_href(@cloud, $map_image_name_root, "PFT Base Linux", $param_location) retrieve $image_href
+  call mci.mci_upsert_cloud_image(@mci, @cloud.href, $image_href)
+
   
   # Set things up for docker stuff
   $inp = {

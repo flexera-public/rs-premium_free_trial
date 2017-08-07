@@ -5,6 +5,7 @@ rs_ca_ver 20160622
 short_description "Utilties related to MCI management."
 
 package "pft/mci"
+import "pft/mci/linux_mappings", as: "linux_mappings"
 import "pft/err_utilities", as: "debug"
 
 
@@ -73,32 +74,37 @@ define mci_setup($os, $map_mci_info, $map_image_name_root, $map_cloud) return @m
       
       # Make sure the cloud is attached to the account. If not don't worry about it.
       if (size(@cloud) > 0)
-        # set up search parameters
-        $base_image_name_with_regexp_extension = map($map_image_name_root, $os, $cloud)
-        $base_image_name = gsub($base_image_name_with_regexp_extension, /<<.*>>/, "")
-        $regexp_extension = gsub($base_image_name_with_regexp_extension, $base_image_name, "")
-        $regexp_extension = gsub($regexp_extension, "<<", "")
-        $regexp_extension = gsub($regexp_extension, ">>", "")
-       
-        # Find images that match the given base name.
-        @images = @cloud.images(filter: ["name=="+$base_image_name])  # partial match
-        #call debug.log("mci_setup - Found "+size(@images)+" images with base name of, "+$base_image_name, "")
-        
-        # Filter these results using any provided trailing regular expression
-        # forward slashes don't play well with the select function, so substitute them with dots.
-        $base_image_selector = "/^"+gsub($base_image_name+$regexp_extension, "/", ".")+"$/"
-        
-        @image = last(select(@images, { "name": $base_image_selector }))
-                   
-        $image_href = @image.href
         $cloud_href = @cloud.href
-        
-        call debug.log("mci_setup - Found image, "+to_s(@image.name)+", href, "+to_s($image_href)+", using regexp, "+$base_image_selector, to_s(@image))
-
+        call find_image_href(@cloud, $map_image_name_root, $os, $cloud) retrieve $image_href
         call mci_upsert_cloud_image(@mci, $cloud_href, $image_href)
       end
     end
   end
+end
+
+define find_image_href(@cloud, $map_image_name_root, $mci, $cloud) return $image_href do
+#  call debug.log("find_image_href inputs", to_s(@cloud)+"; "+$mci_name+"; "+$cloud_name)
+
+  # set up search parameters
+  $base_image_name_with_regexp_extension = map($map_image_name_root, $mci, $cloud)
+  $base_image_name = gsub($base_image_name_with_regexp_extension, /<<.*>>/, "")
+  $regexp_extension = gsub($base_image_name_with_regexp_extension, $base_image_name, "")
+  $regexp_extension = gsub($regexp_extension, "<<", "")
+  $regexp_extension = gsub($regexp_extension, ">>", "")
+ 
+  # Find images that match the given base name.
+  @images = @cloud.images(filter: ["name=="+$base_image_name])  # partial match
+  #call debug.log("mci_setup - Found "+size(@images)+" images with base name of, "+$base_image_name, "")
+  
+  # Filter these results using any provided trailing regular expression
+  # forward slashes don't play well with the select function, so substitute them with dots.
+  $base_image_selector = "/^"+gsub($base_image_name+$regexp_extension, "/", ".")+"$/"
+  
+  @image = last(select(@images, { "name": $base_image_selector }))
+             
+  $image_href = @image.href
+  
+  call debug.log("Found image, "+to_s(@image.name)+", href, "+to_s($image_href)+", using regexp, "+$base_image_selector, to_s(@image))
 end
 
 
@@ -154,4 +160,9 @@ define copy_mci_settings(@source_mci, @target_mci) do
       @target_setting.update(multi_cloud_image_setting: {image_href: $source_href_hash[@target_setting.cloud().href]})
     end
   end
+end
+
+########
+mapping "map_image_name_root" do 
+ like $linux_mappings.map_image_name_root
 end

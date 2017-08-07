@@ -35,7 +35,10 @@ import "pft/linux_server_declarations"
 import "pft/conditions"
 import "pft/cloud_utilities", as: "cloud"
 import "pft/account_utilities", as: "account"
+import "pft/err_utilities", as: "debug"
 import "pft/permissions"
+import "pft/mci"
+import "pft/mci/linux_mappings", as: "linux_mappings"
  
 ##################
 # Permissions    #
@@ -102,6 +105,10 @@ end
 
 mapping "map_config" do 
   like $linux_server_declarations.map_config
+end
+
+mapping "map_image_name_root" do 
+ like $linux_mappings.map_image_name_root
 end
 
 
@@ -191,7 +198,7 @@ end
 ##########################
 
 # Import and set up what is needed for the server and then launch it.
-define pre_auto_launch($map_cloud, $param_location, $invSphere) do
+define pre_auto_launch($map_cloud, $map_config, $map_image_name_root, $param_location, $invSphere) do
   
     # Need the cloud name later on
     $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -200,7 +207,16 @@ define pre_auto_launch($map_cloud, $param_location, $invSphere) do
     # Since different PIB scenarios include different clouds, this check is needed.
     # It raises an error if not which stops execution at that point.
     call cloud.checkCloudSupport($cloud_name, $param_location)
-
+    
+    # Make sure the MCI is pointing to the latest image for the cloud.
+    # This adds about a minute to the launch but is worth it to avoid a failure due to the cloud provider
+    # deprecating the image we use.
+    $mci_name = map($map_config, "mci", "name")
+    call mci.find_mci($mci_name) retrieve @mci
+    @cloud = find("clouds", $cloud_name)
+    call mci.find_image_href(@cloud, $map_image_name_root, "PFT Base Linux", $param_location) retrieve $image_href
+    call mci.mci_upsert_cloud_image(@mci, @cloud.href, $image_href)
+     
 end
 
 define enable(@linux_server, $param_costcenter, $inAzure, $invSphere) return $server_access do
