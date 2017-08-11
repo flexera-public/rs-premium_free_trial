@@ -69,26 +69,15 @@ end
 ################################
 # Outputs returned to the user #
 ################################
-output_set "output_server_ips_private" do
-  condition $invSphere
-  label "Server IP"
-  category "Output"
-  description "IP address for the server(s)."
-  default_value @linux_server.private_ip_address
-end
-
-output_set "output_server_ips_public" do
-  condition $notInVsphere
-  label "Server IP"
-  category "Output"
-  description "IP address for the server(s)."
-  default_value @linux_server.public_ip_address
+output_set "output_server_ips" do
+  label @linux_servers.name
+  category "IP Addresses"
 end
 
 output "vmware_note" do
   condition $invSphere
   label "Deployment Note"
-  category "Output"
+  category "Note"
   default_value "Your CloudApp was deployed in a VMware environment on a private network and so is not directly accessible. If you need access to the CloudApp, please contact your RightScale rep for network access."
 end
 
@@ -117,7 +106,7 @@ end
 ############################
 
 ### Server Definition ###
-resource "linux_server", type: "server", copies: $param_numservers do
+resource "linux_servers", type: "server", copies: $param_numservers do
   like @linux_server_declarations.linux_server
 end
 
@@ -191,6 +180,12 @@ end
 operation "enable" do
   description "Get information once the app has been launched"
   definition "enable"
+  resource_mappings do {
+    @linux_servers => @servers
+  } end
+  output_mappings do {
+    $output_server_ips => $server_ips
+  } end
 end
 
 ##########################
@@ -219,11 +214,26 @@ define pre_auto_launch($map_cloud, $map_config, $map_image_name_root, $param_loc
      
 end
 
-define enable(@linux_server, $param_costcenter, $inAzure, $invSphere) return $server_access do
+define enable(@linux_servers, $param_costcenter, $inAzure, $invSphere) return @servers, $server_ips do
   
     # Tag the servers with the selected project cost center ID.
     $tags=[join(["costcenter:id=",$param_costcenter])]
     rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
+    # Wait until all the servers have IP addresses
+    $server_ips = null
+    if $invSphere
+      $server_ips = map @server in @linux_servers return $ip do
+        sleep_until(@server.private_ip_addresses[0])
+        $ip = @server.private_ip_addresses[0]
+      end
+    else
+      $server_ips = map @server in @linux_servers return $ip do
+        sleep_until(@server.public_ip_addresses[0])
+        $ip = @server.public_ip_addresses[0]
+      end
+    end
+    
+    @servers = @linux_servers
 end 
 
