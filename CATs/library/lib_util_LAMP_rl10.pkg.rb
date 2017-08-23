@@ -88,7 +88,7 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
   # CHEF SERVER
   # Launch the chef server first and wait, it is a prereq.
   ##############################################################################
-  @deployment = rs_cm.servers.empty()
+  @deployment = rs_cm.deployments.empty()
   $tags = rs_cm.tags.by_tag(resource_type:"deployments", tags:["pft:role=shared"])
   call functions.log("deployment_tags", to_json($tags))
   if (empty?($tags[0]))
