@@ -12,7 +12,7 @@ import "pft/rl10/lamp_parameters"
 
 ### Server Declarations ###
 resource 'chef_server', type: 'server' do
-  name join(['Chef-',last(split(@@deployment.href,"/"))])
+  name "Chef Server"
   cloud map( $map_cloud, $param_location, "cloud" )
   datacenter map($map_cloud, $param_location, "zone")
   instance_type map($map_cloud, $param_location, "instance_type")
@@ -35,7 +35,8 @@ resource 'chef_server', type: 'server' do
     'CHEF_ADMIN_FIRST_NAME' => 'text:Premium',
     'CHEF_ADMIN_LAST_NAME' => 'text:FreeTrial',
     'CHEF_ADMIN_USERNAME' => 'text:admin',
-    'CHEF_ADMIN_PASSWORD' => join(['text:',$param_chef_password])
+    'CHEF_ADMIN_PASSWORD' => 'cred:PFT_LAMP_Chef_Admin_Password',
+    'REFRESH_TOKEN' => 'cred:PFT_RS_REFRESH_TOKEN',
   } end
 end
 
@@ -54,9 +55,9 @@ resource 'lb_server', type: 'server' do
   inputs do {
     'BALANCE_ALGORITHM' => 'text:roundrobin',
     'CHEF_ENVIRONMENT' => 'text:_default',
-    'CHEF_SERVER_SSL_CERT' => join(['cred:PFT-LAMP-ChefCert-',last(split(@@deployment.href,"/"))]),
-    'CHEF_SERVER_URL' => 'text:https://1.1.1.1/organizations/pft',
-    'CHEF_VALIDATION_KEY' => join(['cred:PFT-LAMP-ChefValidator-',last(split(@@deployment.href,"/"))]),
+    'CHEF_SERVER_SSL_CERT' => 'cred:PFT_LAMP_ChefCert',
+    'CHEF_SERVER_URL' => 'cred:PFT_LAMP_ChefUrl',
+    'CHEF_VALIDATION_KEY' => 'cred:PFT_LAMP_ChefValidator',
     'CHEF_VALIDATION_NAME' => 'text:pft-validator',
     'CHEF_SSL_VERIFY_MODE' => 'text::verify_none',
     'DELETE_NODE_ON_TERMINATE' => 'text:true',
@@ -92,9 +93,9 @@ resource 'db_server', type: 'server' do
     'DB_BACKUP_LINEAGE' => join(['text:pft_',last(split(@@deployment.href,"/"))]),
     'BIND_NETWORK_INTERFACE' => 'text:private',
     'CHEF_ENVIRONMENT' => 'text:_default',
-    'CHEF_SERVER_SSL_CERT' => join(['cred:PFT-LAMP-ChefCert-',last(split(@@deployment.href,"/"))]),
-    'CHEF_SERVER_URL' => 'text:https://1.1.1.1/organizations/pft',
-    'CHEF_VALIDATION_KEY' => join(['cred:PFT-LAMP-ChefValidator-',last(split(@@deployment.href,"/"))]),
+    'CHEF_SERVER_SSL_CERT' => 'cred:PFT_LAMP_ChefCert',
+    'CHEF_SERVER_URL' => 'cred:PFT_LAMP_ChefUrl',
+    'CHEF_VALIDATION_KEY' => 'cred:PFT_LAMP_ChefValidator',
     'CHEF_VALIDATION_NAME' => 'text:pft-validator',
     'CHEF_SSL_VERIFY_MODE' => 'text::verify_none',
     'DELETE_NODE_ON_TERMINATE' => 'text:true',
@@ -139,9 +140,9 @@ resource 'app_server', type: 'server_array' do
     'APPLICATION_ROOT_PATH' => 'text:pft',
     'BIND_NETWORK_INTERFACE' => 'text:private',
     'CHEF_ENVIRONMENT' => 'text:_default',
-    'CHEF_SERVER_SSL_CERT' => join(['cred:PFT-LAMP-ChefCert-',last(split(@@deployment.href,"/"))]),
-    'CHEF_SERVER_URL' => 'text:https://1.1.1.1/organizations/pft',
-    'CHEF_VALIDATION_KEY' => join(['cred:PFT-LAMP-ChefValidator-',last(split(@@deployment.href,"/"))]),
+    'CHEF_SERVER_SSL_CERT' => 'cred:PFT_LAMP_ChefCert',
+    'CHEF_SERVER_URL' => 'cred:PFT_LAMP_ChefUrl',
+    'CHEF_VALIDATION_KEY' => 'cred:PFT_LAMP_ChefValidator',
     'CHEF_VALIDATION_NAME' => 'text:pft-validator',
     'CHEF_SSL_VERIFY_MODE' => 'text::verify_none',
     'DATABASE_HOST' => join(['env:DB-',last(split(@@deployment.href,"/")),':PRIVATE_IP']),
