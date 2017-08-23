@@ -137,7 +137,6 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
 
     @cloud = rs_cm.get(href: $chef_hash["fields"]["cloud_href"])
 
-    # TODO: These need to be idempotent
     if $needsSshKey
       @chef_ssh_key = @cloud.ssh_keys(filter: ["name==pft_chef_server"])
       if(empty?(@chef_ssh_key))
@@ -178,31 +177,9 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
     @chef_server.get()
     rs_cm.tags.multi_add(resource_hrefs:[@chef_server.current_instance().href], tags:["pft:role=chef_server"])
   end
-
-  # $key_tagval = tag_value(@chef_server.current_instance(), 'chef_org_validator:pft')
-  # $key = gsub(gsub($key_tagval, ',', '\n'), 'eq;', '=')
-  # $key_credname = 'PFT-LAMP-ChefValidator-'+last(split(@@deployment.href,"/"))
-  # rs_cm.credentials.create(credential: {name: $key_credname, value: $key})
-  #
-  # $cert_tagval = tag_value(@chef_server.current_instance(), 'chef_server:ssl_cert')
-  # $cert = gsub(gsub($cert_tagval, ',', '\n'), 'eq;', '=')
-  # $cert_credname = 'PFT-LAMP-ChefCert-'+last(split(@@deployment.href,"/"))
-  # rs_cm.credentials.create(credential: {name: $cert_credname, value: $cert})
-  #
-  # rs_cm.tags.multi_delete(resource_hrefs: @chef_server.href[], tags: ["chef_org_validator:pft="+$key_tagval,"chef_server:ssl_cert="+$cert_tagval])
   ##############################################################################
   # /CHEF SERVER
   ##############################################################################
-
-  # The Chef Server access is via it's private IP if in VMware
-  # $chef_server_ip = @chef_server.current_instance().public_ip_addresses[0]
-  # if $invSphere
-  #   $chef_server_ip = @chef_server.current_instance().private_ip_addresses[0]
-  # end
-  #
-  # $lb_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',$chef_server_ip,'/organizations/pft'])
-  # $webtier_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',$chef_server_ip,'/organizations/pft'])
-  # $db_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',$chef_server_ip,'/organizations/pft'])
 
   @lb_server = $lb_hash
   @app_server = $webtier_hash
