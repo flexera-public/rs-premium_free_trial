@@ -18,7 +18,7 @@ resource 'chef_server', type: 'server' do
   instance_type map($map_cloud, $param_location, "instance_type")
   ssh_key_href map($map_cloud, $param_location, "ssh_key")
   placement_group_href map($map_cloud, $param_location, "pg")
-  security_group_hrefs map($map_cloud, $param_location, "sg")
+  # security_group_hrefs map($map_cloud, $param_location, "sg")
   server_template find(map($map_st, "chef", "name"), revision: map($map_st, "chef", "rev"))
   multi_cloud_image_href find(map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"), revision: map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_rev"))
   network map($map_cloud, $param_location, "network")
