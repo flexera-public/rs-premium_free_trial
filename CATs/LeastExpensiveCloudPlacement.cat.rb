@@ -86,24 +86,24 @@ end
 ################################
 # Outputs returned to the user #
 ################################
-output_set "output_server_ips_public" do
-  label "Server Public IP"
-  category "Server Info"
-  description "Public IP address(es) for the server(s)."
-  default_value @linux_server.public_ip_address
+output_set "output_server_ips" do
+  label @linux_servers.name
+  category "IP Addresses"
 end
 
-output_set "output_server_ips_private" do
-  label "Server Private IP"
-  category "Server Info"
-  description "Private IP address(es) for the server(s)."
-  default_value @linux_server.private_ip_address
-end
-
-output "vmware_note" do
-  label "Deployment Note"
-  category "Server Info"
-end
+#output_set "output_server_ips_public" do
+#  label "Server Public IP"
+#  category "Server Info"
+#  description "Public IP address(es) for the server(s)."
+#  default_value @linux_server.public_ip_address
+#end
+#
+#output_set "output_server_ips_private" do
+#  label "Server Private IP"
+#  category "Server Info"
+#  description "Private IP address(es) for the server(s)."
+#  default_value @linux_server.private_ip_address
+#end
 
 output "selected_cloud" do
   label "Selected Cloud" 
@@ -263,7 +263,7 @@ mapping "map_nulls" do {
 ############################
 
 ### Server Declarations ###
-resource "linux_server", type: "server", copies: $param_numservers do
+resource "linux_servers", type: "server", copies: $param_numservers do
   like @linux_server_declarations.linux_server
   # The following attributes are configured in RCL below once we know which cloud we are using.
   # So we overwrite some placeholder values for now.
@@ -313,7 +313,6 @@ operation "launch" do
   description "Concurrently launch the servers" 
   definition "launch_servers" 
   output_mappings do {
-    $vmware_note => $vmware_note_text,  # only gets populated if deployed in VMware
     $selected_cloud => $cheapest_cloud,
     $hourly_app_cost => $app_cost,
     $aws_cloud_output => $aws_cloud,
@@ -331,10 +330,21 @@ operation "launch" do
   } end
 end
 
+operation "enable" do
+  description "Get information once the app has been launched"
+  definition "enable"
+  resource_mappings do {
+    @linux_servers => @servers
+  } end
+  output_mappings do {
+    $output_server_ips => $server_ips
+  } end
+end
+
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @placement_group, $map_cloud, $map_config, $map_image_name_root, $param_cpu, $param_ram, $param_costcenter, $param_numservers)  return @linux_server, @sec_group, @ssh_key, @placement_group, $param_location, $vmware_note_text, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
+define launch_servers(@linux_servers, @ssh_key, @sec_group, @sec_group_rule_ssh, @placement_group, $map_cloud, $map_config, $map_image_name_root, $param_cpu, $param_ram, $param_numservers)  return @linux_servers, @sec_group, @ssh_key, @placement_group, $param_location, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
 
   # Calculate where to launch the system
   
@@ -408,12 +418,12 @@ define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, 
   
   $update_hash = { "instance_type_href":$cheapest_instance_type_href} + $update_hash 
   $cheapest_instance_type_href = @cloud.instance_types(filter: [join(["name==",$cheapest_instance_type])]).href
-  call modify_resource_definition(@linux_server, $update_hash) retrieve @linux_server
+  call modify_resource_definition(@linux_servers, $update_hash) retrieve @linux_servers
    
   if map($map_cloud, $param_location, "zone")  
     $cheapest_datacenter_href = @cloud.datacenters(filter: [join(["name==",$cheapest_datacenter_name])]).href
     $update_hash = { "datacenter_href":$cheapest_datacenter_href }
-    call modify_resource_definition(@linux_server, $update_hash) retrieve @linux_server
+    call modify_resource_definition(@linux_servers, $update_hash) retrieve @linux_servers
   end
   
   $network_href = ""
@@ -422,7 +432,7 @@ define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, 
     $network_href = @network.href
      
     $update_hash = { "network_href":$network_href }
-    call modify_resource_definition(@linux_server, $update_hash) retrieve @linux_server
+    call modify_resource_definition(@linux_servers, $update_hash) retrieve @linux_servers
   end
   
   if map($map_cloud, $param_location, "subnet")       
@@ -430,28 +440,28 @@ define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, 
     $subnet_href = @subnet.href[]
 
     $update_hash = { "subnet_hrefs":$subnet_href }
-    call modify_resource_definition(@linux_server, $update_hash) retrieve @linux_server
+    call modify_resource_definition(@linux_servers, $update_hash) retrieve @linux_servers
   end
   
   if map($map_cloud, $param_location, "ssh_key")
     provision(@ssh_key)
     
     $update_hash = { "ssh_key_href":@ssh_key.href }
-    call modify_resource_definition(@linux_server, $update_hash) retrieve @linux_server
+    call modify_resource_definition(@linux_servers, $update_hash) retrieve @linux_servers
   end
   
   if map($map_cloud, $param_location, "pg") 
     provision(@placement_group)
     
     $update_hash = { "placement_group_href":@placement_group.href }
-    call modify_resource_definition(@linux_server, $update_hash) retrieve @linux_server
+    call modify_resource_definition(@linux_servers, $update_hash) retrieve @linux_servers
   end
   
   if map($map_cloud, $param_location, "sg")
     provision(@sec_group_rule_ssh)
     
     $update_hash = { "security_group_hrefs":[@sec_group.href] }
-    call modify_resource_definition(@linux_server, $update_hash) retrieve @linux_server
+    call modify_resource_definition(@linux_servers, $update_hash) retrieve @linux_servers
   end
   
 #  call err_utilities.log("chef_sever object hash", to_s(to_object(@chef_server)))
@@ -459,10 +469,36 @@ define launch_servers(@linux_server, @ssh_key, @sec_group, @sec_group_rule_ssh, 
   # At this point we have the server declaration updated with the necessary values from the least expensive cloud search.
   # We've also already provisioned the security groups and ssh keys, etc if needed.
   # So now we are ready to provision the servers. 
-  provision(@linux_server)
+  provision(@linux_servers)
   
   call calc_app_cost($param_numservers) retrieve $app_cost
   
+end 
+
+define enable(@linux_servers, $param_costcenter) return @servers, $server_ips do
+  
+    # Tag the servers with the selected project cost center ID.
+    $tags=[join(["costcenter:id=",$param_costcenter])]
+    rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+      
+    $cloud_type = @linux_servers.current_instance().cloud().cloud_type
+    $invSphere =  equals?($cloud_type, "vscale")
+    
+    # Wait until all the servers have IP addresses
+    $server_ips = null
+    if $invSphere
+      $server_ips = map @server in @linux_servers return $ip do
+        sleep_until(@server.private_ip_addresses[0])
+        $ip = @server.private_ip_addresses[0]
+      end
+    else
+      $server_ips = map @server in @linux_servers return $ip do
+        sleep_until(@server.public_ip_addresses[0])
+        $ip = @server.public_ip_addresses[0]
+      end
+    end
+    
+    @servers = @linux_servers
 end 
 
 # Modify the resource's declaration with the applicable bits given in the $update_hash
