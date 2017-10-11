@@ -23,7 +23,7 @@
 # User can scale out or scale in application servers.
 
 
-name 'D) App Stack - Least Expensive Cloud'
+name 'Dynamic Least Expensive Cloud'
 rs_ca_ver 20161221
 short_description "![logo](https://s3.amazonaws.com/rs-pft/cat-logos/best_price_new.png)
 
@@ -80,6 +80,11 @@ end
 
 parameter "param_costcenter" do
   like $parameters.param_costcenter
+end
+
+parameter "_pricing_result" do
+  label "_pricing_result"
+  type "string"
 end
 
 
@@ -192,6 +197,27 @@ end
 ##############
 # MAPPINGS   #
 ##############
+
+mapping "_dynamic_pricing" do {  
+  "data" => {
+    "url" => "https://s3.us-east-2.amazonaws.com/rs-pricing-test/test_data.json" },  
+  "clouds" => {
+    "aws" => '{
+      "href": "/api/clouds/6",
+      "name": "Amazon Web Services",
+      "datacenter": null,
+      "discount": null }',
+    "azr" => '{
+      "href": "/api/clouds/3518",
+      "name": "Microsoft Azure",
+      "datacenter": null,
+      "discount": null }',
+    "ggl" => '{
+      "href": "/api/clouds/2175",
+      "name": "Google",
+      "datacenter": "us-west1-b",
+      "discount": "sud" }' } }
+end
 
 # Mapping and abstraction of cloud-related items.
 mapping "map_cloud" do {
@@ -344,45 +370,13 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@linux_servers, @ssh_key, @sec_group, @sec_group_rule_ssh, @placement_group, $map_cloud, $map_config, $map_image_name_root, $param_cpu, $param_ram, $param_numservers)  return @linux_servers, @sec_group, @ssh_key, @placement_group, $param_location, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
-
-  # Calculate where to launch the system
-  
-  # Use the pricing API to get some numbers
-  call find_cloud_costs($map_cloud, $map_config, $param_cpu, $param_ram) retrieve $cloud_costs_hash
-  
-  call err_utilities.log("cloud costs hash", to_s($cloud_costs_hash))
-      
-  # Build the cloud cost outputs
-  $aws_cloud = $cloud_costs_hash["Amazon Web Services"]["cloud_name"]
-  $aws_instance_type = $cloud_costs_hash["Amazon Web Services"]["instance_type"]
-  $aws_instance_price = switch($cloud_costs_hash["Amazon Web Services"]["price"] == 10000, "", to_s($cloud_costs_hash["Amazon Web Services"]["price"]))
-  $google_cloud = $cloud_costs_hash["Google"]["cloud_name"]
-  $google_instance_type = $cloud_costs_hash["Google"]["instance_type"]
-  $google_instance_price = switch($cloud_costs_hash["Google"]["price"] == 10000, "", to_s($cloud_costs_hash["Google"]["price"]))
-  $azure_cloud = $cloud_costs_hash["Microsoft Azure"]["cloud_name"]
-  $azure_instance_type = $cloud_costs_hash["Microsoft Azure"]["instance_type"]
-  $azure_instance_price = switch($cloud_costs_hash["Microsoft Azure"]["price"] == 10000, "", to_s($cloud_costs_hash["Microsoft Azure"]["price"]))
-  $vmware_cloud = $cloud_costs_hash["VMware"]["cloud_name"]
-  $vmware_instance_type = $cloud_costs_hash["VMware"]["instance_type"]
-  $vmware_instance_price = switch($cloud_costs_hash["VMware"]["price"] == 10000, "", to_s($cloud_costs_hash["VMware"]["price"]))
-    
-      
-  # Find the least expensive cloud option among the allowed clouds
-  $cheapest_cloud = ""
-  $cheapest_cost = 1000000
-  $cheapest_cloud_href = ""
-  $cheapest_instance_type = ""
-  $cheapest_datacenter_name = ""
-  foreach $cloud in keys($cloud_costs_hash) do
-    if to_n($cloud_costs_hash[$cloud]["price"]) < $cheapest_cost
-      $cheapest_cloud = $cloud
-      $cheapest_cloud_href = $cloud_costs_hash[$cloud]["cloud_href"]
-      $cheapest_datacenter_name = $cloud_costs_hash[$cloud]["datacenter_name"]
-      $cheapest_cost = to_n($cloud_costs_hash[$cloud]["price"])
-      $cheapest_instance_type = $cloud_costs_hash[$cloud]["instance_type"]
-    end
-  end
+define launch_servers($_pricing_result, @linux_servers, @ssh_key, @sec_group, @sec_group_rule_ssh, @placement_group, $map_cloud, $map_config, $map_image_name_root, $param_cpu, $param_ram, $param_numservers)  return @linux_servers, @sec_group, @ssh_key, @placement_group, $param_location, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do
+  $pricing_result = from_json($_pricing_result)
+  $cheapest_cloud = $pricing_result["cloud_name"]
+  $cheapest_cloud_href = $pricing_result["cloud_href"]
+  $cheapest_datacenter_name = $pricing_result["datacenter_name"]
+  $cheapest_cost = to_n($pricing_result["price"])
+  $cheapest_instance_type = $pricing_result["instance_type"]
   @cloud = rs_cm.clouds.get(href: $cheapest_cloud_href)
   
   call err_utilities.log(join(["Selected Cloud: ", $cheapest_cloud, "; Cloud Href: ",$cheapest_cloud_href]), "")
