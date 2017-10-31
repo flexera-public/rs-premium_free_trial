@@ -1,12 +1,12 @@
 name "LIB - Common mappings"
 rs_ca_ver 20160622
-short_description "Mappings that are commonly used across CATs"
+short_description "Mappings that are commonly used across CATs."
 
 package "pft/mappings"
 
 mapping "map_cloud" do {
   "AWS" => {
-    "cloud" => "EC2 us-east-1",
+    "cloud" => "EC2 us-west-2",
     "zone" => null, # We don't care which az AWS decides to use.
     "instance_type" => "m3.medium",
     "sg" => '@sec_group',  
