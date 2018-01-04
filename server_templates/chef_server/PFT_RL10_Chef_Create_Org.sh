@@ -26,4 +26,6 @@ if [ ! -e /srv/chef-server/orgs ]; then
   mkdir -p /srv/chef-server/orgs
 fi
 
-chef-server-ctl org-create "$CHEF_ORG_NAME" "$CHEF_ORG_NAME" --association_user "$CHEF_ADMIN_USERNAME" --filename "/srv/chef-server/orgs/$CHEF_ORG_NAME-validator.pem"
+if [ ! -f "/srv/chef-server/orgs/$CHEF_ORG_NAME-validator.pem" ]; then
+  chef-server-ctl org-create "$CHEF_ORG_NAME" "$CHEF_ORG_NAME" --association_user "$CHEF_ADMIN_USERNAME" --filename "/srv/chef-server/orgs/$CHEF_ORG_NAME-validator.pem"
+fi

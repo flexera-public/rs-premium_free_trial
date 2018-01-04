@@ -63,8 +63,7 @@ RightScripts:
     Revision: 1
   - PFT_RL10_Chef_Create_Admin_User.sh
   - PFT_RL10_Chef_Create_Org.sh
-  - PFT_RL10_Chef_Validator_Pem_to_Tag.sh
-  - PFT_RL10_Chef_Cert_to_Tag.sh
+  - PFT_RL10_Chef_Credentials.sh
   - PFT_RL10_Chef_Install_Cookbooks.sh
   Decommission:
   - Name: RL10 Linux Shutdown Reason
@@ -94,8 +93,7 @@ RightScripts:
     Revision: 8
   - PFT_RL10_Chef_Create_Admin_User.sh
   - PFT_RL10_Chef_Create_Org.sh
-  - PFT_RL10_Chef_Validator_Pem_to_Tag.sh
-  - PFT_RL10_Chef_Cert_to_Tag.sh
+  - PFT_RL10_Chef_Credentials.sh
   - PFT_RL10_Chef_Install_cookbooks.sh
 MultiCloudImages:
 - Name: PFT Base Linux MCI

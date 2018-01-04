@@ -11,7 +11,7 @@ import "pft/rl10/lamp_resources"
 import "pft/err_utilities", as: "functions"
 
 
-define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
+define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $param_chef_password)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
 
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -26,12 +26,18 @@ define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @se
 
   call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
 
-  call launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name)  retrieve @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link
+  call launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name, $param_chef_password)  retrieve @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link
 
 end
 
 
-define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name)  return @chef_server, @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
+define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name, $param_chef_password)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
+  # Stash some definitions in case the chef-server needs to be provisioned
+  $ssh_key = to_object(@ssh_key)
+  $sec_group = to_object(@sec_group)
+  $sec_group_rule_ssh = to_object(@sec_group_rule_ssh)
+  $sec_group_rule_https = to_object(@sec_group_rule_https)
+  $placement_group = to_object(@placement_group)
 
   # Provision the resources
 
@@ -82,33 +88,98 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
   # CHEF SERVER
   # Launch the chef server first and wait, it is a prereq.
   ##############################################################################
-  @chef_server = $chef_hash
-  provision(@chef_server)
+  @deployment = rs_cm.deployments.empty()
+  $tags = rs_cm.tags.by_tag(resource_type:"deployments", tags:["pft:role=shared"])
+  call functions.log("deployment_tags", to_json($tags))
+  if (empty?($tags[0]))
+    call functions.log("deployment_create", "Creating deployment")
+    @deployment = rs_cm.deployment.create(name:join(["PFT Shared Services-",uuid()]))
+    rs_cm.tags.multi_add(resource_hrefs:[@deployment.href], tags:["pft:role=shared"])
+  else
+    call functions.log("deployment_update", "found deployment")
+    $deployment_href = $tags[0][0]["links"][0]["href"]
+    @deployment = rs_cm.get(href: $deployment_href)
+  end
 
-  $key_tagval = tag_value(@chef_server.current_instance(), 'chef_org_validator:pft')
-  $key = gsub(gsub($key_tagval, ',', '\n'), 'eq;', '=')
-  $key_credname = 'PFT-LAMP-ChefValidator-'+last(split(@@deployment.href,"/"))
-  rs_cm.credentials.create(credential: {name: $key_credname, value: $key})
+  @chef_servers = rs_cm.instances.empty()
 
-  $cert_tagval = tag_value(@chef_server.current_instance(), 'chef_server:ssl_cert')
-  $cert = gsub(gsub($cert_tagval, ',', '\n'), 'eq;', '=')
-  $cert_credname = 'PFT-LAMP-ChefCert-'+last(split(@@deployment.href,"/"))
-  rs_cm.credentials.create(credential: {name: $cert_credname, value: $cert})
+  if (!empty?(@deployment.servers()))
+    @servers = @deployment.servers()
+    call functions.log("Found servers in the shared deployment", to_json(to_object(@servers)))
+    @active_servers = select(@servers, { state: "operational" })
+    if (!empty?(@active_servers))
+      @current_instance = @active_servers.current_instance()
+      call functions.log("Found operational servers in the shared deployment", to_json(to_object(@current_instance)))
+    end
 
-  rs_cm.tags.multi_delete(resource_hrefs: @chef_server.href[], tags: ["chef_org_validator:pft="+$key_tagval,"chef_server:ssl_cert="+$cert_tagval])
+    if (!empty?(@current_instance))
+      call functions.log("Searching current instances for chef server tag", to_json(to_object(@current_instance)))
+      $instance_tags = rs_cm.tags.by_resource(resource_hrefs:@current_instance.href[])
+      $tags, @chef_servers = map $instance_tag in $instance_tags[0] return $tag, @instance do
+        $tag = select($instance_tag["tags"], {"name": "pft:role=chef_server"})
+        if (!empty?($tag))
+          @instance = rs_cm.get(href: $instance_tag["links"][0]["href"])
+          call functions.log("Returning an instance with the tag", to_json(to_object(@instance)))
+        end
+      end
+    end
+  end
+
+  if (empty?(@chef_servers))
+    $chef_hash["fields"]["deployment_href"] = @deployment.href
+
+    @password_cred = rs_cm.credentials.get(filter: ["name==PFT_LAMP_Chef_Admin_Password"])
+    if (empty?(@password_cred))
+      rs_cm.credentials.create(credential: {name: "PFT_LAMP_Chef_Admin_Password", value: $param_chef_password})
+    else
+      @password_cred.update(credential: { value: $param_chef_password })
+    end
+
+    @cloud = rs_cm.get(href: $chef_hash["fields"]["cloud_href"])
+
+    if $needsSshKey
+      @chef_ssh_key = @cloud.ssh_keys(filter: ["name==pft_chef_server"])
+      if(empty?(@chef_ssh_key))
+        $ssh_key["fields"]["name"] = "pft_chef_server"
+        @chef_ssh_key = @cloud.ssh_keys().create(ssh_key: $ssh_key["fields"])
+      end
+      $chef_hash["fields"]["ssh_key_href"] = @chef_ssh_key.href
+    end
+
+    if $needsSecurityGroup
+      @chef_sec_group = @cloud.security_groups(filter: ["name==pft_chef_server"])
+      if(empty?(@chef_sec_group))
+        $sec_group["fields"]["name"] = "pft_chef_server"
+        $sec_group["fields"]["deployment_href"] = null
+        @chef_sec_group = @cloud.security_groups().create(security_group: $sec_group["fields"])
+
+        $sec_group_rule_ssh["fields"]["security_group_href"] = @chef_sec_group.href
+        rs_cm.security_group_rules.create(security_group_rule: $sec_group_rule_ssh["fields"])
+
+        $sec_group_rule_https["fields"]["security_group_href"] = @chef_sec_group.href
+        rs_cm.security_group_rules.create(security_group_rule: $sec_group_rule_https["fields"])
+      end
+      $chef_hash["fields"]["security_group_hrefs"] = @chef_sec_group.href[]
+    end
+
+    if $needsPlacementGroup
+      @chef_placement_group = rs_cm.placement_groups.get(filter: ["name==pft_chef_server"])
+      if (empty?(@chef_placement_group))
+        $placement_group["fields"]["name"] = "pft_chef_server"
+        $placement_group["fields"]["deployment_href"] = null
+        @chef_placement_group = rs_cm.placement_groups.create(placement_group: $placement_group["fields"])
+      end
+      $chef_hash["fields"]["placement_group_href"] = @chef_placement_group.href
+    end
+
+    @chef_server = $chef_hash
+    provision(@chef_server)
+    @chef_server.get()
+    rs_cm.tags.multi_add(resource_hrefs:[@chef_server.current_instance().href], tags:["pft:role=chef_server"])
+  end
   ##############################################################################
   # /CHEF SERVER
   ##############################################################################
-
-  # The Chef Server access is via it's private IP if in VMware
-  $chef_server_ip = @chef_server.current_instance().public_ip_addresses[0]
-  if $invSphere
-    $chef_server_ip = @chef_server.current_instance().private_ip_addresses[0]
-  end
-  
-  $lb_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',$chef_server_ip,'/organizations/pft'])
-  $webtier_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',$chef_server_ip,'/organizations/pft'])
-  $db_hash["fields"]["inputs"]["CHEF_SERVER_URL"] = join(['text:https://',$chef_server_ip,'/organizations/pft'])
 
   @lb_server = $lb_hash
   @app_server = $webtier_hash
@@ -201,11 +272,11 @@ define install_appcode($param_appcode, @app_server) do
   @@deployment.multi_update_inputs(inputs: $inp)
   @app_server.next_instance().multi_update_inputs(inputs: $inp)
   @app_server.current_instances().multi_update_inputs(inputs: $inp)
-  
+
   # Update app code
-  call server_templates_utilities.run_script_no_inputs(@app_server, "PHP Appserver Install - chef") 
+  call server_templates_utilities.run_script_no_inputs(@app_server, "PHP Appserver Install - chef")
   # Reconnect to DB
-  call server_templates_utilities.run_script_no_inputs(@app_server, "PFT DB Config") 
+  call server_templates_utilities.run_script_no_inputs(@app_server, "PFT DB Config")
 
 
 end
