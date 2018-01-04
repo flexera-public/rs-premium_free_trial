@@ -43,4 +43,6 @@ if [ ! -e /srv/chef-server/admin-users ]; then
   mkdir -p /srv/chef-server/admin-users
 fi
 
-chef-server-ctl user-create "$CHEF_ADMIN_USERNAME" "$CHEF_ADMIN_FIRST_NAME" "$CHEF_ADMIN_LAST_NAME" "$CHEF_ADMIN_EMAIL" "$CHEF_ADMIN_PASSWORD" --filename "/srv/chef-server/admin-users/$CHEF_ADMIN_USERNAME.pem"
+if [ ! -f "/srv/chef-server/admin-users/$CHEF_ADMIN_USERNAME.pem" ]; then
+  chef-server-ctl user-create "$CHEF_ADMIN_USERNAME" "$CHEF_ADMIN_FIRST_NAME" "$CHEF_ADMIN_LAST_NAME" "$CHEF_ADMIN_EMAIL" "$CHEF_ADMIN_PASSWORD" --filename "/srv/chef-server/admin-users/$CHEF_ADMIN_USERNAME.pem"
+fi
