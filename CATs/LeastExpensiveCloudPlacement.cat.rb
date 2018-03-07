@@ -205,6 +205,7 @@ mapping "map_cloud" do {
     "network" => null,
     "subnet" => null,
     "mci_mapping" => "Public",
+    "tag_prefix" => "ec2"
   },
   "Azure" => {   
     "cloud_provider" => "Microsoft Azure",
@@ -216,6 +217,7 @@ mapping "map_cloud" do {
     "network" => "pft_arm_network",
     "subnet" => "default",
     "mci_mapping" => "Public", 
+    "tag_prefix" => "azure"
   },
   "Google" => {
     "cloud_provider" => "Google",
@@ -227,6 +229,7 @@ mapping "map_cloud" do {
     "network" => null,
     "subnet" => null,
     "mci_mapping" => "Public",
+    "tag_prefix" => "google"
   },
   "VMware" => {  
     "cloud_provider" => "VMware",
@@ -238,6 +241,7 @@ mapping "map_cloud" do {
     "network" => null,
     "subnet" => null,
     "mci_mapping" => "VMware",
+    "tag_prefix" => "vmware"
   }
 }
 end
@@ -344,7 +348,7 @@ end
 ##########################
 # DEFINITIONS (i.e. RCL) #
 ##########################
-define launch_servers(@linux_servers, @ssh_key, @sec_group, @sec_group_rule_ssh, @placement_group, $map_cloud, $map_config, $map_image_name_root, $param_cpu, $param_ram, $param_numservers)  return @linux_servers, @sec_group, @ssh_key, @placement_group, $param_location, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
+define launch_servers(@linux_servers, @ssh_key, @sec_group, @sec_group_rule_ssh, @placement_group, $map_cloud, $map_config, $map_image_name_root, $param_cpu, $param_ram, $param_numservers, $param_costcenter)  return @linux_servers, @sec_group, @ssh_key, @placement_group, $param_location, $cheapest_cloud, $cheapest_instance_type, $app_cost, $aws_cloud, $aws_instance_type, $aws_instance_price, $google_cloud, $google_instance_type, $google_instance_price, $azure_cloud, $azure_instance_type, $azure_instance_price, $vmware_cloud, $vmware_instance_type, $vmware_instance_price do 
 
   # Calculate where to launch the system
   
@@ -473,15 +477,15 @@ define launch_servers(@linux_servers, @ssh_key, @sec_group, @sec_group_rule_ssh,
   
   call calc_app_cost($param_numservers) retrieve $app_cost
   
+  # Tag the servers with the selected project cost center ID.
+  $tags=[join([map($map_cloud, $param_location, "tag_prefix"),":costcenter=",$param_costcenter])]
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+ 
 end 
 
-define enable(@linux_servers, $param_costcenter) return @servers, $server_ips do
+define enable(@linux_servers) return @servers, $server_ips do
   
-    # Tag the servers with the selected project cost center ID.
-    $tags=[join(["costcenter:id=",$param_costcenter])]
-    rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
-      
-    $cloud_type = @linux_servers.current_instance().cloud().cloud_type
+   $cloud_type = @linux_servers.current_instance().cloud().cloud_type
     $invSphere =  equals?($cloud_type, "vscale")
     
     # Wait until all the servers have IP addresses

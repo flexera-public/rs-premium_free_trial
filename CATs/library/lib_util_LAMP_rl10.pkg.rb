@@ -26,18 +26,23 @@ define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @se
 
   call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
 
-  call launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name, $param_chef_password)  retrieve @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link
+  call launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name, $param_chef_password, $param_location, $map_cloud)  retrieve @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link
 
 end
 
 
-define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name, $param_chef_password)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
+define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name, $param_chef_password, $param_location, $map_cloud)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
   # Stash some definitions in case the chef-server needs to be provisioned
   $ssh_key = to_object(@ssh_key)
   $sec_group = to_object(@sec_group)
   $sec_group_rule_ssh = to_object(@sec_group_rule_ssh)
   $sec_group_rule_https = to_object(@sec_group_rule_https)
   $placement_group = to_object(@placement_group)
+  
+  # set up cost center tag for later use
+  $costcenter_tag=[join([map($map_cloud, $param_location, "tag_prefix"),":costcenter=",$param_costcenter])]
+  
+  call functions.log("$tags: "+to_s($tags), "")
 
   # Provision the resources
 
@@ -175,7 +180,9 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
     @chef_server = $chef_hash
     provision(@chef_server)
     @chef_server.get()
-    rs_cm.tags.multi_add(resource_hrefs:[@chef_server.current_instance().href], tags:["pft:role=chef_server"])
+
+    $chef_server_tags = $costcenter_tag + ["pft:role=chef_server"]
+    rs_cm.tags.multi_add(resource_hrefs:[@chef_server.current_instance().href], tags:  $chef_server_tags)
   end
   ##############################################################################
   # /CHEF SERVER
@@ -215,9 +222,8 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
   end
 
   # Now tag the servers with the selected project cost center ID.
-  $tags=[join(["costcenter:id=",$param_costcenter])]
-  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
-  rs_cm.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $tags)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $costcenter_tag)
+  rs_cm.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $costcenter_tag)
 
   # If deployed in Azure one needs to provide the port mapping that Azure uses.
   if $inAzure

@@ -15,6 +15,7 @@ mapping "map_cloud" do {
     "network" => null,
     "subnet" => null,
     "mci_mapping" => "Public",
+    "tag_prefix" => "ec2"
   },
   "Azure" => {   
     "cloud" => "Azure East US",
@@ -26,6 +27,7 @@ mapping "map_cloud" do {
     "network" => null,
     "subnet" => null,
     "mci_mapping" => "Public",
+    "tag_prefix" => "azure"
   },
   "AzureRM" => {   
     "cloud" => "AzureRM East US",
@@ -37,6 +39,7 @@ mapping "map_cloud" do {
     "network" => "pft_arm_network",
     "subnet" => "default",
     "mci_mapping" => "Public",
+    "tag_prefix" => "azure"
   },
   "Google" => {
     "cloud" => "Google",
@@ -48,6 +51,7 @@ mapping "map_cloud" do {
     "network" => null,
     "subnet" => null,
     "mci_mapping" => "Public",
+    "tag_prefix" => "google"
   },
   "VMware" => {
     "cloud" => "VMware Private Cloud",
@@ -59,6 +63,7 @@ mapping "map_cloud" do {
     "network" => null,
     "subnet" => null,
     "mci_mapping" => "VMware",
+    "tag_prefix" => "vmware"
   }
 }
 end

@@ -9,7 +9,7 @@ parameter "param_location" do
   label "Cloud" 
   type "string" 
   allowed_values "AWS", "AzureRM", "Google", "VMware" 
-  default "Google"
+  default "AWS"
 end
 
 parameter "param_numservers" do 

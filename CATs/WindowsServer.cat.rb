@@ -239,10 +239,10 @@ define pre_auto_launch($map_cloud, $param_location, $map_st) do
   @pub_rightscript.import()
 end
 
-define enable(@windows_server, $param_username, $param_password, $param_costcenter, $param_location) do
+define enable(@windows_server, $param_username, $param_password, $param_costcenter, $param_location, $map_cloud) do
   
   # Tag the servers with the selected project cost center ID.
-  $tags=[join(["costcenter:id=",$param_costcenter])]
+  $tags=[join([map($map_cloud, $param_location, "tag_prefix"),":costcenter=",$param_costcenter])]
   rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
   # Run the script to set up the username and password

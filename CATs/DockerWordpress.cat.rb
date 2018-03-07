@@ -253,13 +253,13 @@ define pre_auto_launch($map_cloud, $map_config, $map_image_name_root, $param_loc
 
 end
     
-define enable(@docker_server, $param_costcenter, $invSphere, $inAzure) return $wordpress_link do  
+define enable(@docker_server, $param_costcenter, $invSphere, $inAzure, $param_location, $map_cloud) return $wordpress_link do  
     
   call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services compose")
   call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services up")
   
   # Tag the servers with the selected project cost center ID.
-  $tags=[join(["costcenter:id=",$param_costcenter])]
+  $tags=[join([map($map_cloud, $param_location, "tag_prefix"),":costcenter=",$param_costcenter])]
   rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
     
   # Get the appropriate IP address depending on the environment.
