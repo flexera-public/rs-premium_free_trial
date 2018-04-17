@@ -259,8 +259,10 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure, $param_lo
   call server_templates_utilities.run_script_no_inputs(@docker_server, "APP docker services up")
   
   # Tag the servers with the selected project cost center ID.
+  # The tagging API requires an array of tags and an array of resource hrefs to tag.
   $tags=[join([map($map_cloud, $param_location, "tag_prefix"),":costcenter=",$param_costcenter])]
-  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+  $instance_hrefs = @@deployment.servers().current_instance().href[]  # returns an array of the instance hrefs for all the servers in the deployment.
+  rs_cm.tags.multi_add(resource_hrefs: $instance_hrefs, tags: $tags)
     
   # Get the appropriate IP address depending on the environment.
   if $invSphere
