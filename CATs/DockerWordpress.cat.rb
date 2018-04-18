@@ -261,8 +261,13 @@ define enable(@docker_server, $param_costcenter, $invSphere, $inAzure, $param_lo
   # Tag the servers with the selected project cost center ID.
   # The tagging API requires an array of tags and an array of resource hrefs to tag.
   $tags=[join([map($map_cloud, $param_location, "tag_prefix"),":costcenter=",$param_costcenter])]
-  $instance_hrefs = @@deployment.servers().current_instance().href[]  # returns an array of the instance hrefs for all the servers in the deployment.
-  rs_cm.tags.multi_add(resource_hrefs: $instance_hrefs, tags: $tags)
+  $instance_hrefs = @@deployment.servers().current_instance().href[]
+  # One would normally just pass the entire instance_hrefs[] array to multi_add and so it all in one command.
+  # However, the call to the Azure API will at times take too long and time out.
+  # So tagging one resource at a time avoids this problem and doesn't add any discernible time to the processing.
+  foreach $instance_href in $instance_hrefs do
+    rs_cm.tags.multi_add(resource_hrefs: [$instance_href], tags: $tags)
+  end
     
   # Get the appropriate IP address depending on the environment.
   if $invSphere

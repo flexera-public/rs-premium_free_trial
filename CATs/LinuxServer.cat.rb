@@ -218,7 +218,13 @@ define enable(@linux_servers, $param_costcenter, $inAzure, $invSphere, $param_lo
   
     # Tag the servers with the selected project cost center ID.
     $tags=[join([map($map_cloud, $param_location, "tag_prefix"),":costcenter=",$param_costcenter])]
-    rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $tags)
+    $instance_hrefs = @@deployment.servers().current_instance().href[]
+    # One would normally just pass the entire instance_hrefs[] array to multi_add and so it all in one command.
+    # However, the call to the Azure API will at times take too long and time out.
+    # So tagging one resource at a time avoids this problem and doesn't add any discernible time to the processing.
+    foreach $instance_href in $instance_hrefs do
+      rs_cm.tags.multi_add(resource_hrefs: [$instance_href], tags: $tags)
+    end    
     
     # Wait until all the servers have IP addresses
     $server_ips = null

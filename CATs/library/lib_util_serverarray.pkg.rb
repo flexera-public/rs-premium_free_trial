@@ -50,12 +50,18 @@ define apply_costcenter_tag(@server_array) do
   $costcenter_tag = ""
   foreach $tag_item in $tags_array do
     $tag = $tag_item['name']
-    if $tag =~ /costcenter:id/
+    if $tag =~ /costcenter/
       $costcenter_tag = $tag
     end
   end  
 
   # Now apply the costcenter tag to all the servers in the array - including the one that was just added as part of the scaling operation
-  rs_cm.tags.multi_add(resource_hrefs: @server_array.current_instances().href[], tags: [$costcenter_tag])
+  $instance_hrefs = @server_array.current_instances().href[]
+  # One would normally just pass the entire instance_hrefs[] array to multi_add and so it all in one command.
+  # However, the call to the Azure API will at times take too long and time out.
+  # So tagging one resource at a time avoids this problem and doesn't add any discernible time to the processing.
+  foreach $instance_href in $instance_hrefs do
+    rs_cm.tags.multi_add(resource_hrefs: [$instance_href], tags: [$costcenter_tag])
+  end
 end
 

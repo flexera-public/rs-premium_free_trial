@@ -222,8 +222,14 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
   end
 
   # Now tag the servers with the selected project cost center ID.
-  rs_cm.tags.multi_add(resource_hrefs: @@deployment.servers().current_instance().href[], tags: $costcenter_tag)
-  rs_cm.tags.multi_add(resource_hrefs: @@deployment.server_arrays().current_instances().href[], tags: $costcenter_tag)
+  $instance_hrefs = @@deployment.servers().current_instance().href[]
+  $instance_hrefs = $instance_hrefs + @@deployment.server_arrays().current_instances().href[]
+  # One would normally just pass the entire instance_hrefs[] array to multi_add and so it all in one command.
+  # However, the call to the Azure API will at times take too long and time out.
+  # So tagging one resource at a time avoids this problem and doesn't add any discernible time to the processing.
+  foreach $instance_href in $instance_hrefs do
+    rs_cm.tags.multi_add(resource_hrefs: [$instance_href], tags: $costcenter_tag)
+  end
 
   # If deployed in Azure one needs to provide the port mapping that Azure uses.
   if $inAzure
