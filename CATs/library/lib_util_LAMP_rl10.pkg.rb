@@ -71,19 +71,7 @@ define launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_
 
   $db_hash = to_object(@db_server)
 
-  if $cloud_name == "Google"
-    @cloud = rs_cm.clouds.get(filter: ["name==Google"])
-
-    if (size(@cloud) > 0)
-      @images = @cloud.images(filter: ["name==ubuntu-1404-trusty-v"])  # partial match is all we need
-      @image = last(@images)  # just grab one of them should be ok - may have to do some better regexp matching
-      $image_href = @image.href
-      $chef_hash["fields"]["image_href"] = $image_href
-      $lb_hash["fields"]["image_href"] = $image_href
-      $webtier_hash["fields"]["image_href"] = $image_href
-      $db_hash["fields"]["image_href"] = $image_href
-    end
-  elsif $invSphere # need to change the chef server to use its private IP for the chef URL
+  if $invSphere # need to change the chef server to use its private IP for the chef URL
     call functions.log("Tweaking chef_hash for VMware - before tweak", to_s($chef_hash))
     $chef_hash["fields"]["inputs"]["CHEF_SERVER_FQDN"] = "env:PRIVATE_IP"
     call functions.log("Tweaking chef_hash for VMware - after tweak", to_s($chef_hash))

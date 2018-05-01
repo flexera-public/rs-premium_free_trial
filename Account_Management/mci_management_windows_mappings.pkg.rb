@@ -25,11 +25,11 @@ mapping "map_image_name_root" do {
   "2008R2" => {
     "AWS" => "Windows_Server-2008-R2_SP1-English-64Bit-Base-<<\\d{4}\\.\\d{2}\\.\\d{2}>>",
     "AzureRM" => "MicrosoftWindowsServer WindowsServer 2008-R2-SP1 latest",
-    "Google" => "windows-server-2008-r2-dc-v<<\\d{8}>>",
+    "Google" => "windows-server-2008-r2-latest",
   },
   "2012R2" => {
     "AWS" => "Windows_Server-2012-R2_RTM-English-64Bit-Base-<<\\d{4}\\.\\d{2}\\.\\d{2}>>",
     "AzureRM" => "MicrosoftWindowsServer WindowsServer 2012-R2-Datacenter latest",
-    "Google" => "windows-server-2012-r2-dc-v<<\\d{8}>>",
+    "Google" => "windows-server-2012-r2-latest",
   },
 } end
