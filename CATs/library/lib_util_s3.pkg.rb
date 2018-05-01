@@ -3,6 +3,7 @@ rs_ca_ver 20161221
 short_description "RCL definitions for generating S3 signed URL."
 
 package "pft/s3_utilities"
+import "pft/account_utilities", as: "acct"
 
 # Returns a signed URL for an S3 object
 define get_signed_url($bucket, $object) return $signed_url do
