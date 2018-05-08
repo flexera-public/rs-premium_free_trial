@@ -107,6 +107,20 @@ define find_image_href(@cloud, $map_image_name_root, $mci, $cloud) return $image
   call debug.log("Found image, "+to_s(@image.name)+", href, "+to_s($image_href)+", using regexp, "+$base_image_selector, to_s(@image))
 end
 
+# Some clouds don't support a "latest" designation for images.
+# In those clouds, it's useful to check if the MCI is pointing at a deprecated image and fix things if so.
+# This adds about a minute to the launch but is worth it to avoid a failure due to the cloud provider
+# deprecating the image we use.
+define updateImage($param_location, $mci_name, $map_config)
+  if $param_location == "AWS"
+    $mci_name = map($map_config, "mci", "name")
+    call find_mci($mci_name) retrieve @mci
+    @cloud = find("clouds", $cloud_name)
+    call find_image_href(@cloud, $map_image_name_root, $mci_name, $param_location) retrieve $image_href
+    call mci_upsert_cloud_image(@mci, @cloud.href, $image_href)
+  end
+end
+
 
 # Update an MCI to point to a new image for a given cloud, or add an image to
 # for a cloud which was not previously supported.

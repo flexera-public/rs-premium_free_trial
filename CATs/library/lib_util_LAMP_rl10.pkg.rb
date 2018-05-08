@@ -21,9 +21,6 @@ define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @se
   # It raises an error if not which stops execution at that point.
   call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
 
-  # Find and import the server template - just in case it hasn't been imported to the account already
-  # call server_templates_utilities.importServerTemplate($map_st)
-
   call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
 
   call launch_resources(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $cloud_name, $param_chef_password, $param_location, $map_cloud)  retrieve @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link

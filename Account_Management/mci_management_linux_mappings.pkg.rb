@@ -24,13 +24,13 @@ mapping "map_mci_info" do {
 mapping "map_image_name_root" do {
   "PFT Base Linux" => {
     "AWS" => "ubuntu/images/hvm-ssd/ubuntu-trusty-14.04-amd64-server-<<\\d{8}>>",
-    "AzureRM" => "Canonical UbuntuServer 14.04.0-LTS 14.04.<<\\d{8}\[0-9\]+>>", # it looks like it is a date yyyymmdd and then a number which I'm
+    "AzureRM" => "Canonical UbuntuServer 14.04.0-LTS latest", 
     "Google" => "ubuntu-1404-lts-latest",
     "VMware" => "PFT_Ubuntu_vmware"
   },
   "PFT Ubuntu 16.04" => {
     "AWS" => "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-<<\\d{4}\\d{2}\\d{2}>>",
-    "AzureRM" => "Canonical UbuntuServer 16.04.0-LTS 16.04.<<\\d{8}[0-9]+>>", # it looks like it is a date yyyymmdd and then a number which I'm
+    "AzureRM" => "Canonical UbuntuServer 16.04.0-LTS latest", 
     "Google" => "ubuntu-1604-lts-latest",
   },
 } end
