@@ -234,7 +234,7 @@ define pre_auto_launch($map_cloud, $map_config, $map_image_name_root, $param_loc
   call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
   
   # For some clouds we check if the image is deprecated and if so, update the MCI to use the latest version.
-  call mci.updateImage($param_location, "PFT Base Linux", $map_config)
+  call mci.updateImage($cloud_name, $param_location, map($map_config, "mci", "name"))
   
   # Set things up for docker stuff
   $inp = {

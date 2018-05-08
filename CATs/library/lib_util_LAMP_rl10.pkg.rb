@@ -11,7 +11,7 @@ import "pft/rl10/lamp_resources"
 import "pft/err_utilities", as: "functions"
 
 
-define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $param_chef_password)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
+define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $map_mci, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $param_chef_password)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
 
   # Need the cloud name later on
   $cloud_name = map( $map_cloud, $param_location, "cloud" )
@@ -20,6 +20,9 @@ define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @se
   # Since different PIB scenarios include different clouds, this check is needed.
   # It raises an error if not which stops execution at that point.
   call cloud_utilities.checkCloudSupport($cloud_name, $param_location)
+  
+  # For some clouds we check if the image is deprecated and if so, update the MCI to use the latest version.
+  call mci.updateImage($cloud_name, $param_location, map($map_mci, map($map_cloud, $param_location, "mci_mapping"), "mci_name"))
 
   call creds_utilities.createCreds(["CAT_MYSQL_ROOT_PASSWORD","CAT_MYSQL_APP_PASSWORD","CAT_MYSQL_APP_USERNAME"])
 

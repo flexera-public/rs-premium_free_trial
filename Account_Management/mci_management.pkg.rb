@@ -111,7 +111,7 @@ end
 # In those clouds, it's useful to check if the MCI is pointing at a deprecated image and fix things if so.
 # This adds about a minute to the launch but is worth it to avoid a failure due to the cloud provider
 # deprecating the image we use.
-define updateImage($param_location, $mci_name, $map_config) do
+define updateImage($cloud_name, $param_location, $mci_name) do
   if $param_location == "AWS"
     $mci_name = map($map_config, "mci", "name")
     call find_mci($mci_name) retrieve @mci

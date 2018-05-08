@@ -405,12 +405,7 @@ define launch_servers(@linux_servers, @ssh_key, @sec_group, @sec_group_rule_ssh,
   call err_utilities.log(join(["param_location: ",$param_location]), "")
     
   # Make sure the MCI is pointing to the latest image for the cloud.
-  # This adds about a minute to the launch but is worth it to avoid a failure due to the cloud provider
-  # deprecating the image we use.
-  $mci_name = map($map_config, "mci", "name")
-  call mci.find_mci($mci_name) retrieve @mci
-  call mci.find_image_href(@cloud, $map_image_name_root, "PFT Base Linux", switch($param_location == "Azure", "AzureRM", $param_location)) retrieve $image_href
-  call mci.mci_upsert_cloud_image(@mci, @cloud.href, $image_href)
+  call mci.updateImage(@cloud.name, $param_location, map($map_config, "mci", "name"))
     
   # Finish configuring the resource declarations so they are ready for launch
       
