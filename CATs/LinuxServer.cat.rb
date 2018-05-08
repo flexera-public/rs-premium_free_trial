@@ -202,15 +202,9 @@ define pre_auto_launch($map_cloud, $map_config, $map_image_name_root, $param_loc
     # Since different PIB scenarios include different clouds, this check is needed.
     # It raises an error if not which stops execution at that point.
     call cloud.checkCloudSupport($cloud_name, $param_location)
-    
-    # Make sure the MCI is pointing to the latest image for the cloud.
-    # This adds about a minute to the launch but is worth it to avoid a failure due to the cloud provider
-    # deprecating the image we use.
-    $mci_name = map($map_config, "mci", "name")
-    call mci.find_mci($mci_name) retrieve @mci
-    @cloud = find("clouds", $cloud_name)
-    call mci.find_image_href(@cloud, $map_image_name_root, "PFT Base Linux", $param_location) retrieve $image_href
-    call mci.mci_upsert_cloud_image(@mci, @cloud.href, $image_href)
+  
+    # For some clouds we check if the image is deprecated and if so, update the MCI to use the latest version.
+    call mci.updateImage($param_location, "PFT Base Linux", $map_config)
      
 end
 
