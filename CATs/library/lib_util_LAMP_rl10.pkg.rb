@@ -9,6 +9,8 @@ import "pft/cloud_utilities"
 import "pft/creds_utilities"
 import "pft/rl10/lamp_resources"
 import "pft/err_utilities", as: "functions"
+import "pft/mci"
+
 
 define launcher(@chef_server, @lb_server, @app_server, @db_server, @ssh_key, @sec_group, @sec_group_rule_ssh, @sec_group_rule_http, @sec_group_rule_https, @sec_group_rule_http8080, @sec_group_rule_mysql, @placement_group, $param_costcenter, $map_cloud, $map_st, $map_mci, $map_image_name_root, $param_location, $inAzure, $invSphere, $needsSshKey, $needsPlacementGroup, $needsSecurityGroup, $param_chef_password)  return @lb_server, @app_server, @db_server, @sec_group, @ssh_key, @placement_group, $site_link, $lb_status_link do
 
