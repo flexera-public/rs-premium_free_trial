@@ -40,7 +40,7 @@ define mci_setup($os, $map_mci_info, $map_image_name_root, $map_cloud) return @m
   
   # Name of the custom MCI we are creating/updating
   $mci_name = map($map_mci_info, $os, "custom_mci_name")
-#  call debug.log("mci_setup - working on custom MCI, "+$mci_name, "")
+  call debug.log("mci_setup - working on custom MCI, "+$mci_name, "")
 
   # Check if the MCI already exists
   call find_mci($mci_name) retrieve @mci
@@ -61,6 +61,12 @@ define mci_setup($os, $map_mci_info, $map_image_name_root, $map_cloud) return @m
   
   # At this point, we have an MCI that was created or already existed.
   # Now it's time to have it point to the latest images in the connected clouds
+  
+  # First, let's just clean it out and then we'll repopulate it with the images we want.
+  @mci.settings().destroy()
+  sleep_until(size(@mci.settings()) == 0)
+    
+  # Now populate
   @clouds = rs_cm.clouds.get()
   $cloud_type_hash = {
     "azure_v2": "AzureRM",
@@ -93,7 +99,6 @@ define find_image_href(@cloud, $map_image_name_root, $mci, $cloud) return $image
 #  call debug.log("find_image_href inputs: "+$mci+"; "+$cloud, to_s(@cloud))
 #  call debug.log("find_image_href map_image_name_root", to_s($map_image_name_root))
 
-
   # set up search parameters
   $base_image_name_with_regexp_extension = map($map_image_name_root, $mci, $cloud)
   $base_image_name = gsub($base_image_name_with_regexp_extension, /<<.*>>/, "")
@@ -116,34 +121,21 @@ define find_image_href(@cloud, $map_image_name_root, $mci, $cloud) return $image
 #  call debug.log("Found image, "+to_s(@image.name)+", href, "+to_s($image_href)+", using regexp, "+$base_image_selector, to_s(@image))
 end
 
-# Some clouds don't support a "latest" designation for images.
-# In those clouds, it's useful to check if the MCI is pointing at a deprecated image and fix things if so.
-# This adds about a minute to the launch but is worth it to avoid a failure due to the cloud provider
-# deprecating the image we use.
-define updateImage($cloud_name, $param_location, $mci_name, $map_image_name_root) do
-  if $param_location == "AWS"
-    call find_mci($mci_name) retrieve @mci
-    @cloud = find("clouds", $cloud_name)
-    call find_image_href(@cloud, $map_image_name_root, $mci_name, $param_location) retrieve $image_href
-    call mci_upsert_cloud_image(@mci, @cloud.href, $image_href)
-  end
-end
-
 
 # Update an MCI to point to a new image for a given cloud, or add an image to
 # for a cloud which was not previously supported.
 define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
-  call debug.log("mci_upsert_cloud_image: "+to_s(@mci.name)+"; cloud_href: " + to_s($cloud_href) + ", image_href: "+ to_s($image_href), to_s(to_object(@mci)))
+#  call debug.log("mci_upsert_cloud_image: "+to_s(@mci.name)+"; cloud_href: " + to_s($cloud_href) + ", image_href: "+ to_s($image_href), to_s(to_object(@mci)))
   @setting = @mci.settings(filter: ["cloud_href=="+$cloud_href])
   
   if (size(@setting) > 0) # update use case
-    call debug.log("mci_upsert_cloud_image - updating existing cloud image reference in MCI", "")
+#    call debug.log("mci_upsert_cloud_image - updating existing cloud image reference in MCI", "")
     sub on_error: handle_mci_update_error(@mci, $cloud_href, $image_href) do
       @setting.update(multi_cloud_image_setting: {image_href: $image_href})
     end
   else # insert case
     #  call debug.log("mci_upsert_cloud- mci: " + to_s(@mci.href) + ", mci_setting: ", to_s(@mci_setting))
-    call debug.log("mci_upsert_cloud_image - adding cloud image reference to MCI", "")
+#    call debug.log("mci_upsert_cloud_image - adding cloud image reference to MCI", "")
     @cloud = rs_cm.get(href: $cloud_href)
     @instance_types = @cloud.instance_types()
     @instance_type = first(@instance_types) 
@@ -159,6 +151,19 @@ define handle_mci_update_error(@mci, $cloud_href, $image_href) do
   call debug.log("Error with the MCI setting update: mci: "+to_s(@mci.name)+"; cloud_href: "+$cloud_href+"; image_href: "+$image_href, to_s($_errors))
   @setting.destroy()
   call mci_upsert_cloud_image(@mci, $cloud_href, $image_href)
+end
+
+# Some clouds don't support a "latest" designation for images.
+# In those clouds, it's useful to check if the MCI is pointing at a deprecated image and fix things if so.
+# This adds about a minute to the launch but is worth it to avoid a failure due to the cloud provider
+# deprecating the image we use.
+define updateImage($cloud_name, $param_location, $mci_name, $map_image_name_root) do
+  if $param_location == "AWS"
+    call find_mci($mci_name) retrieve @mci
+    @cloud = find("clouds", $cloud_name)
+    call find_image_href(@cloud, $map_image_name_root, $mci_name, $param_location) retrieve $image_href
+    call mci_upsert_cloud_image(@mci, @cloud.href, $image_href)
+  end
 end
   
 
