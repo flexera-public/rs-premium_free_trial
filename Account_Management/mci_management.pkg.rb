@@ -140,8 +140,7 @@ define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
     @instance_types = @cloud.instance_types()
     @instance_type = first(@instance_types) 
     sub on_error: skip do  # Multiple attempts at adding the same setting are ignored
-      @mci_settings = @mci.settings()
-      @mci_settings.create(multi_cloud_image_setting: {image_href: $image_href, cloud_href: $cloud_href, instance_type_href: @instance_type.href})
+      @mci.settings().create(multi_cloud_image_setting: {image_href: $image_href, cloud_href: $cloud_href, instance_type_href: @instance_type.href})
     end
   end
 end
