@@ -405,7 +405,7 @@ define launch_servers(@linux_servers, @ssh_key, @sec_group, @sec_group_rule_ssh,
   call err_utilities.log(join(["param_location: ",$param_location]), "")
     
   # Make sure the MCI is pointing to the latest image for the cloud.
-  call mci.updateImage(@cloud.name, $param_location, map($map_config, "mci", "name"))
+  call mci.updateImage(@cloud.name, $param_location, map($map_config, "mci", "name"), $map_image_name_root)
     
   # Finish configuring the resource declarations so they are ready for launch
       
