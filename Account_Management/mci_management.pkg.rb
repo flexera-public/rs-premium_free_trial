@@ -133,15 +133,17 @@ end
 # Update an MCI to point to a new image for a given cloud, or add an image to
 # for a cloud which was not previously supported.
 define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
-#  call debug.log("mci_upsert_cloud_image - cloud_href: " + to_s($cloud_href) + ", image_href: "+ to_s($image_href), to_s(to_object(@mci)))
+  call debug.log("mci_upsert_cloud_image: "+to_s(@mci.name)+"; cloud_href: " + to_s($cloud_href) + ", image_href: "+ to_s($image_href), to_s(to_object(@mci)))
   @setting = @mci.settings(filter: ["cloud_href=="+$cloud_href])
   
   if (size(@setting) > 0) # update use case
-    #call debug.log("mci_upsert_cloud_image - updating existing cloud image reference in MCI", "")
-    @setting.update(multi_cloud_image_setting: {image_href: $image_href})
+    call debug.log("mci_upsert_cloud_image - updating existing cloud image reference in MCI", "")
+    sub on_error: handle_mci_update_error(@mci, $cloud_href, $image_href) do
+      @setting.update(multi_cloud_image_setting: {image_href: $image_href})
+    end
   else # insert case
     #  call debug.log("mci_upsert_cloud- mci: " + to_s(@mci.href) + ", mci_setting: ", to_s(@mci_setting))
-    #call debug.log("mci_upsert_cloud_image - adding cloud image reference to MCI", "")
+    call debug.log("mci_upsert_cloud_image - adding cloud image reference to MCI", "")
     @cloud = rs_cm.get(href: $cloud_href)
     @instance_types = @cloud.instance_types()
     @instance_type = first(@instance_types) 
@@ -151,6 +153,14 @@ define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
     end
   end
 end
+
+# If there's a problem updating the setting, let's just delete the problematice setting and try again.
+define handle_mci_update_error(@mci, $cloud_href, $image_href) do
+  call debug.log("Error with the MCI setting update: mci: "+to_s(@mci.name)+"; cloud_href: "+$cloud_href+"; image_href: "+$image_href, to_s($_errors))
+  @setting.destroy()
+  call mci_upsert_cloud_image(@mci, $cloud_href, $image_href)
+end
+  
 
 # Update a given MCI with the settings from another MCI
 define copy_mci_settings(@source_mci, @target_mci) do
