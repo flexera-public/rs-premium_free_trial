@@ -22,7 +22,7 @@ mapping "map_mci_info" do {
 # However, you can add a trailing regexp, in square brackets [ ], to handle cases where the name changes over time.
 # Note the need to escape any backslashes.
 mapping "map_image_name_root" do {
-  "PFT Base Linux" => {
+  "PFT Base Linux MCI" => {
     "AWS" => "ubuntu/images/hvm-ssd/ubuntu-trusty-14.04-amd64-server-<<\\d{8}>>",
     "AzureRM" => "Canonical UbuntuServer 14.04.0-LTS latest", 
     "Google" => "ubuntu-1404-lts-latest",

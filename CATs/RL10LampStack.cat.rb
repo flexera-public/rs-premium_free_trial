@@ -42,6 +42,7 @@ import "pft/server_templates_utilities"
 import "pft/server_array_utilities"
 import "pft/rl10/lamp_utilities", as: "lamp_utilities"
 import "pft/permissions"
+import "pft/mci/linux_mappings", as: "linux_mappings"
  
 ##################
 # Permissions    #
@@ -120,6 +121,10 @@ end
 # Allows for easier maintenance down the road if needed.
 mapping "map_db_creds" do
   like $lamp_mappings.map_db_creds
+end
+
+mapping "map_image_name_root" do 
+ like $linux_mappings.map_image_name_root
 end
 
 ##################
