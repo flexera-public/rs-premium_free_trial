@@ -130,7 +130,7 @@ define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
   
   if (size(@setting) > 0) # update use case
 #    call debug.log("mci_upsert_cloud_image - updating existing cloud image reference in MCI", "")
-    sub on_error: handle_mci_update_error(@mci, $cloud_href, $image_href) do
+    sub on_error: handle_mci_update_error(@mci, @setting, $cloud_href, $image_href) do
       @setting.update(multi_cloud_image_setting: {image_href: $image_href})
     end
   else # insert case
@@ -146,7 +146,7 @@ define mci_upsert_cloud_image(@mci, $cloud_href, $image_href) do
 end
 
 # If there's a problem updating the setting, let's just delete the problematice setting and try again.
-define handle_mci_update_error(@mci, $cloud_href, $image_href) do
+define handle_mci_update_error(@mci, @setting, $cloud_href, $image_href) do
   call debug.log("Error with the MCI setting update: mci: "+to_s(@mci.name)+"; cloud_href: "+$cloud_href+"; image_href: "+$image_href, to_s($_errors))
   @setting.destroy()
   call mci_upsert_cloud_image(@mci, $cloud_href, $image_href)
