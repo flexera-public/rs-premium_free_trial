@@ -24,6 +24,10 @@ then
   options=$*
 fi
 
+OAUTH_REFRESH_TOKEN=""
+ACCOUNT_ID=""
+SHARD_HOSTNAME="us-4.rightscale.com"
+
 # Check for required environment variables
 if [[ -z "$OAUTH_REFRESH_TOKEN" || -z "$ACCOUNT_ID" || -z "$SHARD_HOSTNAME" ]]
 then
@@ -84,7 +88,9 @@ done
 
 if [[ "$missing_cred" == "true" ]]
 then
-    exit 1
+    #exit 1
+    rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME cm15 create credentials "credential[name]=PFT_RS_REFRESH_TOKEN" "credential[value]=$OAUTH_REFRESH_TOKEN"
+
 fi
 
 # Finally, if STS import is specified, and the Chef Server isn't already imported
@@ -306,3 +312,8 @@ then
 else
   echo "Skipping CAT publication."
 fi
+
+access_token=$(curl -H "X-API-Version:1.5" -X POST https://${SHARD_HOSTNAME}/api/oauth2 -d "grant_type=refresh_token" -d "refresh_token=${OAUTH_REFRESH_TOKEN}" | jq '.access_token' | sed 's/"//g')
+
+echo "Revoking refresh token"
+curl -H "Authorization: Bearer ${access_token}" -X POST https://${SHARD_HOSTNAME}/acct/${ACCOUNT_ID}/accounts/${ACCOUNT_ID}/revoke_oauth
