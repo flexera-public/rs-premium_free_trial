@@ -164,6 +164,7 @@ then
     cat_name=$(sed -n -e "s/^name[[:space:]]['\"]*\(.*\)['\"]/\1/p" $cat_filename)
     echo "Checking to see if ($cat_name - $cat_filename) has already been uploaded..."
     cat_href=$(rsc -r $OAUTH_REFRESH_TOKEN -a $ACCOUNT_ID -h $SHARD_HOSTNAME ss index collections/$ACCOUNT_ID/templates "filter[]=name==$cat_name" | jq -r '.[0].href')
+    echo "cat_href information ($cat_name - $cat_href)"
     if [[ -z "$cat_href" ]]
     then
       echo "($cat_name - $cat_filename) not already uploaded, creating it now..."
