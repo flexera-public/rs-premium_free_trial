@@ -94,7 +94,7 @@ RightScripts:
   - PFT_RL10_Chef_Create_Admin_User.sh
   - PFT_RL10_Chef_Create_Org.sh
   - PFT_RL10_Chef_Credentials.sh
-  - PFT_RL10_Chef_Install_cookbooks.sh
+  - PFT_RL10_Chef_Install_Cookbooks.sh
 MultiCloudImages:
 - Name: PFT Base Linux MCI
 Alerts:
